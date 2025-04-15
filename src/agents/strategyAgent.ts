@@ -1,44 +1,65 @@
+import fs from 'fs/promises';
+import path from 'path';
 import { AgentInput, AgentResponse } from '../types.js';
 import { callLLM } from '../utils/llm.js';
 
+const PROMPT_TEMPLATE_PATH = path.join('prompts', 'strategyPrompt.txt');
+
 /**
- * Constructs a prompt for the Strategy Agent based on the input context.
+ * Loads the prompt template from the file system.
+ * 
+ * @returns The prompt template string or null if not found.
+ */
+async function loadPromptTemplate(): Promise<string | null> {
+    try {
+        return await fs.readFile(PROMPT_TEMPLATE_PATH, 'utf-8');
+    } catch (error) {
+        console.error(`Error reading prompt template ${PROMPT_TEMPLATE_PATH}:`, error);
+        return null;
+    }
+}
+
+/**
+ * Constructs a prompt for the Strategy Agent by loading a template
+ * and injecting context data.
  * 
  * @param input The input context for the agent.
+ * @param template The prompt template string.
  * @returns The constructed prompt string.
  */
-function constructStrategyPrompt(input: AgentInput): string {
-    // Basic prompt construction - this will be refined later using templates (Phase 3)
-    let prompt = `You are the Strategy Agent for an AI-Native company called CompanyOS.
-    The Creative Director (human operator) has provided the following daily pulse:
-    - Date: ${input.currentPulse.date}
-    - Today's Goal: ${input.currentPulse.goal}
-    - Blockers: ${input.currentPulse.blockers.join(', ') || 'None'}
-    - User Feedback: ${input.currentPulse.user_feedback.join(', ') || 'None'}
-    - Energy Level: ${input.currentPulse.energy_level}
-    - Emotional State: ${input.currentPulse.emotional_state}
-`;
+function constructStrategyPromptFromTemplate(input: AgentInput, template: string): string {
+    let prompt = template;
+    
+    // Replace basic pulse placeholders
+    prompt = prompt.replace('{{date}}', input.currentPulse.date);
+    prompt = prompt.replace('{{goal}}', input.currentPulse.goal);
+    prompt = prompt.replace('{{blockers}}', input.currentPulse.blockers.join(', ') || 'None');
+    prompt = prompt.replace('{{user_feedback}}', input.currentPulse.user_feedback.join(', ') || 'None');
+    prompt = prompt.replace('{{energy_level}}', input.currentPulse.energy_level);
+    prompt = prompt.replace('{{emotional_state}}', input.currentPulse.emotional_state);
 
+    // Replace optional pulse history placeholder
+    let historyText = '';
     if (input.pulseHistory && input.pulseHistory.length > 0) {
-        prompt += `\n\nRecent Pulse History (last ${input.pulseHistory.length} days):
+        historyText = `\n\nRecent Pulse History (last ${input.pulseHistory.length} days):
 `;
         input.pulseHistory.forEach(hist => {
-            prompt += `- ${hist.date}: Goal: ${hist.goal}, State: ${hist.emotional_state}\n`;
+            historyText += `- ${hist.date}: Goal: ${hist.goal}, State: ${hist.emotional_state}\n`;
         });
     }
+    prompt = prompt.replace('{{pulse_history}}', historyText.trim());
 
+    // Replace optional company summary placeholder
+    let summaryText = '';
     if (input.companyDocs) {
-        prompt += `\n\nCompany Summary:
+        summaryText = `\n\nCompany Summary:
 ${input.companyDocs.summary}
 `;
     }
-
-    prompt += `\nBased on the current pulse, recent history, and company summary, please provide:
-1.  Your top 3 strategic recommendations for today as a numbered list.
-2.  Any potential concerns or risks as a bulleted list (prefix with *).
-3.  An overall confidence score (0.0 to 1.0) for your recommendations, as a single number on a new line.
-
-Respond ONLY with the numbered recommendations, bulleted concerns, and the confidence score, each on new lines where appropriate. Do not include any other explanatory text.`;
+    prompt = prompt.replace('{{company_summary}}', summaryText.trim());
+    
+    // Clean up potential double newlines if optional sections were empty
+    prompt = prompt.replace(/\n\n\n/g, '\n\n'); 
 
     return prompt;
 }
@@ -78,8 +99,8 @@ function parseLLMResponse(llmResponse: string): Partial<AgentResponse> {
 /**
  * Runs the Strategy Agent.
  * 
- * Constructs a prompt using the input context,
- * calls an LLM, and parses the response.
+ * Loads a prompt template, injects context, calls an LLM, 
+ * and parses the response.
  * 
  * @param input The input context for the agent.
  * @returns A promise that resolves to the agent's response.
@@ -87,7 +108,19 @@ function parseLLMResponse(llmResponse: string): Partial<AgentResponse> {
 export async function runStrategyAgent(input: AgentInput): Promise<AgentResponse> {
     console.log(`Running Strategy Agent with goal: ${input.currentPulse.goal}`);
 
-    const prompt = constructStrategyPrompt(input);
+    const template = await loadPromptTemplate();
+    if (!template) {
+        console.error("Failed to load strategy prompt template. Using fallback response.");
+        return {
+            agent: "strategy",
+            recommendations: ["Error: Failed to load prompt template."],
+            concerns: [],
+            confidence: 0.0,
+        };
+    }
+
+    const prompt = constructStrategyPromptFromTemplate(input, template);
+    // console.log("\n--- Constructed Prompt ---\n", prompt, "\n------------------------\n"); // Uncomment for debugging
     const llmResponse = await callLLM(prompt);
 
     let parsedData: Partial<AgentResponse> = {};
@@ -99,7 +132,7 @@ export async function runStrategyAgent(input: AgentInput): Promise<AgentResponse
 
     const finalResponse: AgentResponse = {
         agent: "strategy",
-        recommendations: parsedData.recommendations || ["LLM call failed or parsing error."],
+        recommendations: parsedData.recommendations?.length ? parsedData.recommendations : ["LLM call failed or parsing error."],
         concerns: parsedData.concerns || [],
         confidence: parsedData.confidence ?? 0.0, // Default confidence if missing
     };

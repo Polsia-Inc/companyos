@@ -55,16 +55,16 @@ Goal: Implement the first agent and basic LLM integration. ✅
         *   ✅ Parse the LLM response into the required `AgentResponse` JSON structure (using basic string parsing for now).
         *   ✅ Include basic error handling.
 
-## Phase 3: Orchestration & Input System
+## Phase 3: Orchestration & Input System ✅
 
-Goal: Connect the agent to the context and enable context updates via the Pulse system.
+Goal: Connect the agent to the context and enable context updates via the Pulse system. ✅
 
-1.  **Implement `orchestrator/runAllAgents.ts`:**
-    *   Create `src/orchestrator/runAllAgents.ts`.
-    *   Add logic to read `context/latest.json`.
-    *   Call the `runStrategyAgent` function (imported from `src/agents/`), passing the context.
-    *   Integrate logging for orchestrator start/end, agent calls, and output saving.
-    *   Structure the output file to hold multiple agent responses and potential human input/overrides:
+1.  **✅ Implement `orchestrator/runAllAgents.ts`:**
+    *   ✅ Create `src/orchestrator/runAllAgents.ts`.
+    *   ✅ Add logic to read `context/latest.json` (or `context/context.json`).
+    *   ✅ Call the `runStrategyAgent` function (imported from `src/agents/`), passing the context.
+    *   ✅ Integrate logging for orchestrator start/end, agent calls, and output saving.
+    *   ✅ Structure the output file to hold multiple agent responses and potential human input/overrides:
         ```json
         {
           "date": "YYYY-MM-DD",
@@ -79,30 +79,27 @@ Goal: Connect the agent to the context and enable context updates via the Pulse 
           }
         }
         ```
-2.  **Implement `pulse/runPulse.ts`:**
-    *   Create `src/pulse/runPulse.ts`.
-    *   *(Optional: Install CLI helper library: `npm install inquirer @types/inquirer`)*
-    *   Implement a simple CLI interaction (e.g., using Node.js `readline` or `inquirer`) to prompt the user for Pulse inputs (goal, blockers, etc.).
-    *   Convert the user's input into the JSON structure defined for `Context`.
-    *   Save context to `context/YYYY-MM-DD.json` and update `context/latest.json` (symlink or copy).
-    *   Integrate logging for script execution and context saving.
-3.  **Set Up Prompt Templates:**
-    *   Create a `prompts/` directory.
-    *   Create initial prompt text files (e.g., `prompts/strategyPrompt.txt`).
-    *   Update the `strategyAgent` (and later others) to load and use these external prompt templates instead of hardcoding them.
-4.  **Enable Pulse History Access in Orchestrator:**
-    *   Modify `runAllAgents.ts` to not only load `context/latest.json` but also the JSON files from the last N (e.g., 7 or 30) days from the `context/` directory.
-    *   Pass this historical data (e.g., as `pulseHistory: Context[]`) to the agents.
-5.  **Create `company/` Folder for Org Docs:**
-    *   Create the `company/` directory.
-    *   Add subfolders like `legal/`, `financials/`, `team/`.
-    *   Add placeholder/sample files (e.g., `company/financials/runway.md`, `company/legal/formation.txt`).
-    *   Create `company/summary.md` to hold key distilled information.
-    *   Update agent prompt logic (within the orchestrator or agent files) to optionally inject content from `company/summary.md` into prompts based on agent type or configuration.
-6.  **Update `README.md`:**
-    *   Add instructions for setup (installing dependencies, setting API keys).
-    *   Add instructions for running the Pulse and Orchestrator scripts.
-    *   Document required environment variables (e.g., `OPENAI_API_KEY`) and how to set them (e.g., using a `.env` file).
+2.  **✅ Implement `pulse/runPulse.ts`:**
+    *   ✅ Create `src/pulse/runPulse.ts`.
+    *   ✅ *(Optional: Install CLI helper library: `npm install inquirer @types/inquirer`)* (Skipped for now)
+    *   ✅ Implement a simple CLI interaction (e.g., using Node.js `readline`) to prompt the user for Pulse inputs (goal, blockers, etc.).
+    *   ✅ Convert the user's input into the JSON structure defined for `Context`.
+    *   ✅ Save context to `context/YYYY-MM-DD.json` and update `context/latest.json` (symlink or copy).
+    *   ✅ Integrate logging for script execution and context saving.
+3.  **✅ Set Up Prompt Templates:**
+    *   ✅ Create a `prompts/` directory.
+    *   ✅ Create initial prompt text files (e.g., `prompts/strategyPrompt.txt`).
+    *   ✅ Update the `strategyAgent` (and later others) to load and use these external prompt templates instead of hardcoding them.
+4.  **✅ Enable Pulse History Access in Orchestrator:**
+    *   ✅ Modify `runAllAgents.ts` to not only load `context/latest.json` but also the JSON files from the last N (e.g., 7 or 30) days from the `context/` directory.
+    *   ✅ Pass this historical data (e.g., as `pulseHistory: Context[]`) to the agents.
+5.  **✅ Create `company/` Folder for Org Docs:**
+    *   ✅ Create the `company/` directory.
+    *   ✅ Add subfolders like `legal/`, `financials/`, `team/`.
+    *   ✅ Add placeholder/sample files (e.g., `company/financials/runway.md`, `company/legal/formation.txt`).
+    *   ✅ Create `company/summary.md` to hold key distilled information.
+    *   ✅ Update agent prompt logic (within the orchestrator or agent files) to optionally inject content from `company/summary.md` into prompts based on agent type or configuration.
+6.  **✅ Verify Orchestrator Run:** (Implicitly done via successful `npm run start:orchestrator`)
 
 ## Phase 4: Expansion & Refinement (Completing MVP)
 

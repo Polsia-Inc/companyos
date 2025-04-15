@@ -27,7 +27,7 @@ const openai = new OpenAI({
  * @param model The model to use (e.g., 'gpt-4o', 'gpt-3.5-turbo'). Defaults to 'gpt-4o'.
  * @returns A promise that resolves to the LLM's response content or null if an error occurs.
  */
-export async function callLLM(prompt: string, model: string = 'gpt-4o'): Promise<string | null> {
+export async function callLLM(prompt: string, model: string = 'chatgpt-4o-latest'): Promise<string | null> {
     if (!apiKey) {
         console.error('Cannot call LLM: OPENAI_API_KEY is not set.');
         return null;

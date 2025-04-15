@@ -1,0 +1,22 @@
+{
+  "version": "0.1",
+  "description": "A simple, evolving memory store for CompanyOS. Initially focused on weekly summaries.",
+  "weekly_summaries": [
+    {
+      "week_ending_date": "YYYY-MM-DD",
+      "summary_content": "Placeholder summary for the week. Could be generated manually or via LLM.",
+      "key_decisions": [
+        "Placeholder decision 1"
+      ],
+      "learnings": [
+        "Placeholder learning 1"
+      ]
+    }
+  ],
+  "long_term_goals": [
+    "Placeholder long-term goal 1"
+  ],
+  "core_values": [
+    "Placeholder core value 1"
+  ]
+} 

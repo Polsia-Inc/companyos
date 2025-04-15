@@ -58,7 +58,7 @@ ${JSON.stringify(input.currentPulse, null, 2)}
 ${JSON.stringify(input.otherAgentReports || {}, null, 2)}
 
 ## Company Memo (if available):
-${input.companyDocs?.summary || 'Not available'}
+${input.companyMemo ? JSON.stringify(input.companyMemo, null, 2) : 'Not available'}
 
 # Chief of Staff Synthesis:
 `;

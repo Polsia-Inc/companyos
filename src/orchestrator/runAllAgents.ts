@@ -8,13 +8,17 @@ import { runProductAgent } from '../agents/productAgent.js';
 import { runEngineeringAgent } from '../agents/engineeringAgent.js';
 import { runMarketingAgent } from '../agents/marketingAgent.js';
 import { runChiefOfStaffAgent } from '../agents/chiefOfStaffAgent.js';
+import * as readline from 'node:readline/promises';
+import { stdin as input, stdout as output } from 'node:process';
 
 const CONTEXT_DIR = 'context';
 const OUTPUTS_DIR = 'outputs';
 const COMPANY_DIR = 'company';
+const MEMORY_DIR = 'memory';
 const LATEST_CONTEXT_FILE = path.join(CONTEXT_DIR, 'latest.json');
 const INITIAL_CONTEXT_FILE = path.join(CONTEXT_DIR, 'context.json');
 const COMPANY_SUMMARY_FILE = path.join(COMPANY_DIR, 'summary.md');
+const COMPANY_MEMO_FILE = path.join(MEMORY_DIR, 'company-memo.json');
 const PULSE_HISTORY_DAYS = 7; // Load last 7 days of history
 
 /**
@@ -101,6 +105,63 @@ async function loadCompanySummary(): Promise<string | null> {
 }
 
 /**
+ * Loads the company memo JSON object.
+ * 
+ * @returns The company memo object or null if not found/invalid.
+ */
+async function loadCompanyMemo(): Promise<object | null> {
+    try {
+        const memoContent = await fs.readFile(COMPANY_MEMO_FILE, 'utf-8');
+        console.log(`Loaded company memo from ${COMPANY_MEMO_FILE}`);
+        return JSON.parse(memoContent);
+    } catch (error: any) {
+        if (error.code === 'ENOENT') {
+            console.warn(`Warning: ${COMPANY_MEMO_FILE} not found.`);
+        } else if (error instanceof SyntaxError) {
+             console.error(`Error parsing JSON from ${COMPANY_MEMO_FILE}:`, error);
+        } else {
+            console.error(`Error reading ${COMPANY_MEMO_FILE}:`, error);
+        }
+        return null;
+    }
+}
+
+/**
+ * Prompts the user for feedback on agent outputs.
+ * @param agentName The name of the agent being reviewed.
+ * @param agentOutput The output produced by the agent (string or object).
+ * @param rl The readline interface.
+ * @returns A promise resolving to the feedback object.
+ */
+async function getFeedbackForAgent(agentName: string, agentOutput: string | AgentResponse | null, rl: readline.Interface): Promise<{ rating: number | null; notes: string | null }> {
+    console.log(`\n--- Reviewing ${agentName} Agent ---`);
+    // Display output snippet for context (adjust snippet logic as needed)
+    let outputSnippet = 'No output or failed.';
+    if (typeof agentOutput === 'string') {
+        outputSnippet = agentOutput.substring(0, 300) + (agentOutput.length > 300 ? '...' : '');
+    } else if (agentOutput && typeof agentOutput === 'object') {
+        // Handle AgentResponse object - maybe show recommendations?
+        outputSnippet = JSON.stringify(agentOutput.recommendations || agentOutput.flags || agentOutput.concerns || 'No specific items found').substring(0, 300) + '...';
+    }
+    console.log(`Output Snippet:\n${outputSnippet}`);
+
+    let rating: number | null = null;
+    while (rating === null) {
+        const ratingInput = await rl.question(`Rate ${agentName} output (1-5, 0 to skip): `);
+        const parsedRating = parseInt(ratingInput, 10);
+        if (!isNaN(parsedRating) && parsedRating >= 0 && parsedRating <= 5) {
+            rating = parsedRating === 0 ? null : parsedRating; // Store null if skipped
+        } else {
+            console.log("Invalid input. Please enter a number between 1 and 5, or 0 to skip.");
+        }
+    }
+
+    const notes = await rl.question(`Notes for ${agentName} (optional): `);
+
+    return { rating, notes: notes || null };
+}
+
+/**
  * Main orchestrator function.
  */
 async function runOrchestrator() {
@@ -115,9 +176,10 @@ async function runOrchestrator() {
 
     const pulseHistory = await loadPulseHistory(PULSE_HISTORY_DAYS);
     const companySummary = await loadCompanySummary();
+    const companyMemo = await loadCompanyMemo();
 
     // 2. Construct Agent Input
-    const agentInput: AgentInput = {
+    const baseAgentInput: AgentInput = {
         currentPulse: currentPulse,
         pulseHistory: pulseHistory.length > 0 ? pulseHistory : undefined,
         companyDocs: companySummary ? { summary: companySummary } : undefined,
@@ -130,7 +192,7 @@ async function runOrchestrator() {
     const runAgent = async (name: string, agentFn: (input: AgentInput) => Promise<string | AgentResponse>) => {
         try {
             console.log(`\n--- Running ${name} Agent ---`);
-            const response = await agentFn(agentInput);
+            const response = await agentFn(baseAgentInput);
             agentResponses[name.toLowerCase()] = response; // Store response keyed by lowercase name
             console.log(`--- ${name} Agent Complete ---`);
         } catch (error) {
@@ -145,22 +207,13 @@ async function runOrchestrator() {
         { name: 'Strategy', runner: runStrategyAgent },
         { name: 'Ethics', runner: runEthicsAgent },
         { name: 'Wellness', runner: runWellnessAgent },
-        { name: 'Product', runner: runProductAgent }, // Add new agent
-        { name: 'Engineering', runner: runEngineeringAgent }, // Add new agent
-        { name: 'Marketing', runner: runMarketingAgent }, // Add new agent
+        { name: 'Product', runner: runProductAgent },
+        { name: 'Engineering', runner: runEngineeringAgent },
+        { name: 'Marketing', runner: runMarketingAgent },
     ];
 
     // Run agents sequentially and collect responses
     for (const agent of agentsToRun) {
-        // Pass the current set of responses to the next agent
-        // NOTE: The placeholder AgentInput in new agents might need adjustment
-        // if they expect the specific AgentResponse type from existing agents.
-        // For now, passing all collected string/AgentResponse objects.
-        const currentInput = {
-             ...agentInput,
-             // Pass previous agent outputs if needed (adapt AgentInput interface accordingly)
-             // Example: otherAgentReports: agentResponses
-        };
         await runAgent(agent.name, agent.runner);
     }
 
@@ -168,17 +221,13 @@ async function runOrchestrator() {
     let chiefOfStaffDirective: string | null = null;
     try {
         console.log(`\n--- Running Chief of Staff Agent ---`);
-        // Construct input for Chief of Staff, including all previous agent responses
         const chiefOfStaffInput: AgentInput = {
-            ...agentInput, // Includes currentPulse, pulseHistory, companyDocs
-            otherAgentReports: agentResponses, // Pass all collected responses
+            ...baseAgentInput,
+            otherAgentReports: agentResponses,
+            companyMemo: companyMemo ?? undefined,
         };
         chiefOfStaffDirective = await runChiefOfStaffAgent(chiefOfStaffInput);
         console.log(`--- Chief of Staff Agent Complete ---`);
-        // Optionally log the directive here for immediate visibility
-        // console.log("\n====== Chief of Staff Directive ======");
-        // console.log(chiefOfStaffDirective);
-        // console.log("====================================\n");
     } catch (error) {
         console.error(`Error running Chief of Staff Agent:`, error);
         chiefOfStaffDirective = `Chief of Staff Agent failed to run: ${error instanceof Error ? error.message : String(error)}`;
@@ -188,18 +237,33 @@ async function runOrchestrator() {
     const outputDate = new Date().toISOString().split('T')[0];
     const outputFilePath = path.join(OUTPUTS_DIR, `${outputDate}.json`);
 
-    const outputData = {
+    // Define the structure for the output data, including the feedback field
+    const outputData: {
+        date: string;
+        context_used: any;
+        responses: { [key: string]: string | AgentResponse };
+        chief_of_staff_summary: string | null;
+        creative_director_input: {
+            notes: string | null;
+            manual_overrides: object;
+            agent_feedback?: { // Make feedback optional initially
+                [agentName: string]: { rating: number | null; notes: string | null };
+            };
+        };
+    } = {
         date: outputDate,
         context_used: {
             currentPulse: currentPulse,
             pulseHistoryCount: pulseHistory.length,
             companySummaryLoaded: !!companySummary,
+            companyMemoLoaded: !!companyMemo,
         },
         responses: agentResponses,
-        chief_of_staff_summary: chiefOfStaffDirective, // Add the directive to the output
-        creative_director_input: { // Placeholder
+        chief_of_staff_summary: chiefOfStaffDirective,
+        creative_director_input: { // Initialize matching the defined structure
             notes: null,
             manual_overrides: {},
+            // agent_feedback will be added later if user provides feedback
         },
     };
 
@@ -209,6 +273,48 @@ async function runOrchestrator() {
         console.log(`Successfully wrote output to ${outputFilePath}`);
     } catch (error) {
         console.error(`Error writing output file ${outputFilePath}:`, error);
+    }
+
+    // 5. Optional Feedback Loop
+    const rl = readline.createInterface({ input, output });
+    try {
+        const collectFeedback = await rl.question('\nDo you want to provide feedback on the agent outputs? (y/N) ');
+        if (collectFeedback.toLowerCase() === 'y') {
+            console.log("\n--- Starting Feedback Loop --- ");
+            // We need to read the file we just wrote to get the structured data
+            // Alternatively, we could work with the outputData object directly
+            const feedbackData = outputData; // Work with the in-memory object directly
+            // Initialize agent_feedback if it doesn't exist (it shouldn't initially)
+            feedbackData.creative_director_input.agent_feedback = {};
+
+            // Iterate through agent responses
+            for (const agentName in feedbackData.responses) {
+                const agentFeedback = await getFeedbackForAgent(agentName, feedbackData.responses[agentName], rl);
+                if (agentFeedback.rating !== null || agentFeedback.notes !== null) {
+                    feedbackData.creative_director_input.agent_feedback[agentName] = agentFeedback;
+                }
+            }
+
+            // Get feedback for Chief of Staff separately
+            if (feedbackData.chief_of_staff_summary) {
+                 const cosFeedback = await getFeedbackForAgent('ChiefOfStaff', feedbackData.chief_of_staff_summary, rl);
+                 if (cosFeedback.rating !== null || cosFeedback.notes !== null) {
+                     feedbackData.creative_director_input.agent_feedback['chief_of_staff'] = cosFeedback;
+                 }
+            }
+
+            // Re-write the output file with feedback
+            try {
+                await fs.writeFile(outputFilePath, JSON.stringify(feedbackData, null, 2));
+                console.log(`\nUpdated output file ${outputFilePath} with feedback.`);
+            } catch (writeError) {
+                console.error(`Error writing updated output file ${outputFilePath}:`, writeError);
+            }
+        }
+    } catch (feedbackError) {
+        console.error("Error during feedback loop:", feedbackError);
+    } finally {
+        rl.close();
     }
 
     console.log("Orchestrator finished.");

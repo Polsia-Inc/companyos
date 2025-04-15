@@ -62,17 +62,16 @@ This plan focuses on making CompanyOS a living operating layer that synthesizes,
 
 **Goal:** Add persistence and a mechanism for user refinement.
 
-1.  **Scaffold Memory Layer:**
-    *   Create the `memory/` directory.
-    *   Create `memory/company-memo.json`. Define initial schema for weekly memory summaries (manual or LLM-generated).
-    *   *Optional:* Integrate reading `company-memo.json` as context for the Chief of Staff agent.
-2.  **Implement Feedback Hook:**
-    *   Modify the `start:review` script (or equivalent mechanism).
-    *   Prompt the user (Ben) to rate each agent's output (e.g., 1-5).
-    *   Allow text feedback on what worked/didn't.
-    *   Save this feedback into the daily output JSON (e.g., under `creative_director_input`).
+1.  ✅ **Scaffold Memory Layer:**
+    *   ✅ Create the `memory/` directory.
+    *   ✅ Create `memory/company-memo.json`. Define initial schema for weekly memory summaries (manual or LLM-generated).
+    *   ✅ *Optional:* Integrate reading `company-memo.json` as context for the Chief of Staff agent (Implemented in orchestrator and agent).
+2.  ✅ **Implement Feedback Hook:**
+    *   ✅ Modify the orchestrator (`src/orchestrator/runAllAgents.ts`) to include an interactive feedback loop.
+    *   ✅ Prompt the user (Ben) to rate each agent's output (e.g., 1-5) and provide optional text notes.
+    *   ✅ Save this feedback into the daily output JSON under `creative_director_input.agent_feedback`.
 
-**Testing:** Verify that the `company-memo.json` file is created. Test the feedback mechanism by running the review script and ensuring the ratings/comments are captured in the output file. Check if the Chief of Staff agent can optionally read the memo.
+**Testing:** Verify that the `company-memo.json` file is created and loaded. Test the feedback mechanism by running the orchestrator, opting into feedback, and ensuring the ratings/comments are captured in the updated output file.
 
 ---
 

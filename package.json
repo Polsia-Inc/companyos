@@ -1,0 +1,22 @@
+{
+  "name": "companyos",
+  "version": "0.1.0",
+  "description": "Agentic Operating System to Build and Run AI-Native Companies",
+  "main": "dist/orchestrator/runAllAgents.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start:pulse": "node dist/pulse/runPulse.js",
+    "start:orchestrator": "node dist/orchestrator/runAllAgents.js",
+    "dev:pulse": "ts-node src/pulse/runPulse.ts",
+    "dev:orchestrator": "ts-node src/orchestrator/runAllAgents.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^22.14.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  }
+}

@@ -2,7 +2,7 @@
 
 **Goal:** Make CompanyOS useful *enough* that Ben can confidently follow it to ship Blanks, and truthfully say: *"Blanks was built by CompanyOS."*
 
-This plan focuses on making CompanyOS a living operating layer that synthesizes, prioritizes, surfaces insight, reduces noise, and gives clear direction.
+This plan focuses on making CompanyOS a living operating layer that synthesizes, prioritizes, surfaces insight, reduces noise, and gives clear direction. The ultimate goal of CompanyOS isn't just output, it's cognitive leverage — replacing the CEO's need to manually prioritize, reflect, or delegate every morning.
 
 ---
 
@@ -48,7 +48,7 @@ This plan focuses on making CompanyOS a living operating layer that synthesizes,
 2.  **Implement Chief of Staff Agent Runner:**
     *   Create `src/agents/chiefOfStaffAgent.ts`.
     *   This agent will take the outputs from all other agents, the current Pulse, and potentially the previous day's summary as input.
-    *   It will output a structured `chief_of_staff_summary`.
+    *   It will output a structured `chief_of_staff_summary` containing a simple directive: What to **Do**, What to **Delay**, What to **Ignore**, and What to **Delegate** (linking actions to specific agents or systems where applicable).
     *   *(Optional Suggestion): Consider enhancing the output to include "Defer" or "Delegate" actions (e.g., "Delegate X to Engineering Agent") in addition to "Do/Ignore". This paves the way for future agent-initiated workflows.*
 3.  **Update Orchestrator:**
     *   Run the Chief of Staff agent *after* all other agents have completed.
@@ -64,7 +64,7 @@ This plan focuses on making CompanyOS a living operating layer that synthesizes,
 
 1.  **Scaffold Memory Layer:**
     *   Create the `memory/` directory.
-    *   Create `memory/company-memo.json`. Initially, this can be a simple placeholder structure. Define how it might store weekly summaries (manual or LLM-generated).
+    *   Create `memory/company-memo.json`. Define initial schema for weekly memory summaries (manual or LLM-generated).
     *   *Optional:* Integrate reading `company-memo.json` as context for the Chief of Staff agent.
 2.  **Implement Feedback Hook:**
     *   Modify the `start:review` script (or equivalent mechanism).
@@ -85,10 +85,15 @@ This plan focuses on making CompanyOS a living operating layer that synthesizes,
     *   Implement the final formatted "Chief of Staff Summary" block to be printed at the end of the execution.
     ```txt
     ====== 🧠 Chief of Staff Summary ======
-    TODAY:
-    1. Do X
-    2. Ignore Y
-    3. Move Z forward
+    TODAY'S DIRECTIVE:
+    ✅ DO:
+       1. [Actionable Task 1]
+    ⏳ DELAY:
+       1. [Task to revisit later]
+    ❌ IGNORE:
+       1. [Distraction or low-priority item]
+    Delegated:
+       1. [Task assigned to specific agent/system]
 
     Why:
     • [Strategic insight here]
@@ -134,4 +139,80 @@ This phased approach allows for incremental development and testing:
 3.  **Phase 3:** Introduce basic memory and user feedback.
 4.  **Phase 4:** Polish the user-facing output.
 
-Following this plan will transition CompanyOS from an echo chamber to a functional operating layer providing synthesized daily direction. 
+Following this plan will transition CompanyOS from an echo chamber to a functional operating layer providing synthesized daily direction.
+
+---
+
+## 🔭 Future Agent Expansion & Prioritization
+
+*(This section captures longer-term thinking about agent expansion beyond v0.2, based on the principle of balancing vision with pragmatism.)*
+
+### Guiding Principle: Build Only What You'd Want in a Founding Team
+
+If you were hiring 5 core **thinkers** tomorrow, who would they be? That forms the core agent council.
+
+### Agent Tiers for Phased Introduction
+
+Here's a list of **possible agents**, categorized for prioritization:
+
+| Tier | Description |
+|------|-------------|
+| **🧠 Tier 1 — Critical Core** | Foundational for daily multi-dimensional clarity. |
+| **🔄 Tier 2 — High leverage (Soon)** | Add once the core feels tight and their domain becomes a daily focus. |
+| **🧩 Tier 3 — Optional/Contextual** | Add only as needed or if the product/company evolves significantly. |
+
+---
+
+#### 🧠 **Tier 1 — Critical Core (Target: v0.3 Council)**
+
+| Agent | Focus |
+|-------|-------|
+| **Strategy Agent** | Strategic priorities, tradeoffs, milestones |
+| **Product Agent** | UX quality, app flow, user empathy |
+| **Engineering Agent** | Technical debt, bottlenecks, bundling, code gen |
+| **Marketing Agent** | Distribution, messaging, virality |
+| **Ethics Agent** | Alignment with values, risks, long-term trust |
+| **Wellness Agent** | Your energy, burnout risk, mental/emotional clarity |
+| **Chief of Staff Agent** | Synthesizes all of the above into a daily directive |
+
+---
+
+#### 🔄 **Tier 2 — High Leverage (Consider for v0.4+)**
+
+| Agent | Focus |
+|-------|-------|
+| **Finance Agent** | Runway, infra cost, cap table, funding tradeoffs |
+| **Fundraising Agent** | Investor communication, round planning, term sheet review |
+| **Customer Agent** | Feedback analysis, user motivation patterns |
+| **Community Agent** | Contributor engagement, viral feedback loops, social design |
+| **Legal Agent** | App Store risk, IP exposure, ToS + moderation design |
+| **Design Agent** | UI, motion, animation consistency, visual feel |
+| **Growth Agent** | Retention, onboarding funnel, metric instrumentation |
+
+---
+
+#### 🧩 **Tier 3 — Optional / Specialized (Consider for v1.0+)**
+
+| Agent | Focus |
+|-------|-------|
+| **Recruiting Agent** | Sourcing/hiring early team, outsourcing vs in-house |
+| **Internationalization Agent** | Localization, global UI sensitivity, cultural UX |
+| **AI Research Agent** | Tracking LLM improvements, model evaluation |
+| **Compliance Agent** | If expanding into regulated territory (e.g., health, fintech) |
+| **AI Governance Agent** | Meta-level system reflection, bias detection, memory ethics |
+
+---
+
+### Proposed Phased Agent Rollout (Beyond v0.2)
+
+| Phase | Agents Introduced/Active |
+|-------|--------------------------|
+| **v0.3** | Strategy, Product, Engineering, Marketing, Ethics, Wellness, Chief of Staff (The Tier 1 Council) |
+| **v0.4** | Consider adding Finance, Fundraising, Design, Customer (from Tier 2 based on need) |
+| **v1.0+** | Explore Tier 3 agents and potentially allow user customization of active agents. |
+
+### Recommendation Summary (Beyond v0.2)
+
+*   Focus on the **Tier 1 council** for v0.3 first.
+*   Add **Tier 2 agents** (like Finance) pragmatically; add only if they become part of daily decision friction.
+*   Keep **Tier 3 agents** modular but inactive until a clear need arises. 

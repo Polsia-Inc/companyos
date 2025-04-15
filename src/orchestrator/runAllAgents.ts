@@ -7,6 +7,7 @@ import { runWellnessAgent } from '../agents/wellnessAgent.js';
 import { runProductAgent } from '../agents/productAgent.js';
 import { runEngineeringAgent } from '../agents/engineeringAgent.js';
 import { runMarketingAgent } from '../agents/marketingAgent.js';
+import { runChiefOfStaffAgent } from '../agents/chiefOfStaffAgent.js';
 
 const CONTEXT_DIR = 'context';
 const OUTPUTS_DIR = 'outputs';
@@ -122,8 +123,8 @@ async function runOrchestrator() {
         companyDocs: companySummary ? { summary: companySummary } : undefined,
     };
 
-    // 3. Run Agents (Updated to run all Tier 1 agents sequentially)
-    const agentResponses: { [key: string]: string | AgentResponse } = {}; // Use object to store results keyed by agent name
+    // 3. Run Agents (Tier 1 Council + Chief of Staff)
+    const agentResponses: { [key: string]: string | AgentResponse } = {};
 
     // Helper to run an agent and store its result or error
     const runAgent = async (name: string, agentFn: (input: AgentInput) => Promise<string | AgentResponse>) => {
@@ -163,6 +164,26 @@ async function runOrchestrator() {
         await runAgent(agent.name, agent.runner);
     }
 
+    // 3.5 Run Chief of Staff Agent (after all others)
+    let chiefOfStaffDirective: string | null = null;
+    try {
+        console.log(`\n--- Running Chief of Staff Agent ---`);
+        // Construct input for Chief of Staff, including all previous agent responses
+        const chiefOfStaffInput: AgentInput = {
+            ...agentInput, // Includes currentPulse, pulseHistory, companyDocs
+            otherAgentReports: agentResponses, // Pass all collected responses
+        };
+        chiefOfStaffDirective = await runChiefOfStaffAgent(chiefOfStaffInput);
+        console.log(`--- Chief of Staff Agent Complete ---`);
+        // Optionally log the directive here for immediate visibility
+        // console.log("\n====== Chief of Staff Directive ======");
+        // console.log(chiefOfStaffDirective);
+        // console.log("====================================\n");
+    } catch (error) {
+        console.error(`Error running Chief of Staff Agent:`, error);
+        chiefOfStaffDirective = `Chief of Staff Agent failed to run: ${error instanceof Error ? error.message : String(error)}`;
+    }
+
     // 4. Format and Save Output
     const outputDate = new Date().toISOString().split('T')[0];
     const outputFilePath = path.join(OUTPUTS_DIR, `${outputDate}.json`);
@@ -174,7 +195,8 @@ async function runOrchestrator() {
             pulseHistoryCount: pulseHistory.length,
             companySummaryLoaded: !!companySummary,
         },
-        responses: agentResponses, // Directly use the collected responses object
+        responses: agentResponses,
+        chief_of_staff_summary: chiefOfStaffDirective, // Add the directive to the output
         creative_director_input: { // Placeholder
             notes: null,
             manual_overrides: {},

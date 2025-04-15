@@ -1,36 +1,51 @@
-# Daily Pulse - {{DATE}}
+# Daily Pulse — {{DATE}}
 
-*This template helps capture your daily state and focus for CompanyOS.*
+*This template helps capture your daily state and focus for CompanyOS. This input is used by your agents (Strategy, Ethics, Wellness, etc.) to understand your current reality.*
 
-## 🎯 Today's Primary Goal
+---
 
-*What is the single most important thing to accomplish today?*
+## 🎯 What is today’s #1 priority?
 
-> Answer:
-
-## 🚧 Current Blockers / Friction
-
-*What obstacles are slowing you down or causing friction?*
-
-> Answer:
-
-## 💡 Recent User Feedback / Insights
-
-*Any notable feedback or insights from users, metrics, or observations?*
-
-> Answer:
-
-## ✨ Energy Level
-
-*On a scale (e.g., Low, Medium, High) or description:*
-
-> Answer:
-
-## 😊 Emotional State
-
-*How are you feeling today? (e.g., Focused, Tired, Optimistic, Stressed)*
+*The single most important thing you want to accomplish or move forward.*
 
 > Answer:
 
 ---
-*(This template will be used by `runPulse.ts` to generate `context/YYYY-MM-DD.json`)*
+
+## 🧱 What’s causing friction or slowing things down?
+
+*Any blockers, uncertainties, tech issues, decision fatigue, etc.*
+
+> Answer:
+
+---
+
+## 💬 Any user feedback, reactions, or insights?
+
+*Can be from friends, testers, usage patterns, tweets, etc.*
+
+> Answer:
+
+---
+
+## 🔋 Energy Level
+
+*Low, Medium, High — or describe it in your own words (e.g., “wired but tired”)*
+
+> Answer:
+
+---
+
+## 🧠 Emotional State
+
+*One or two words describing how you feel today (e.g., “focused,” “restless,” “motivated but overwhelmed”)*
+
+> Answer:
+
+---
+
+## 🗣️ Anything else you want your agents to know?
+
+*Optional. Freeform thoughts, venting, requests for help, mental notes.*
+
+> Answer:

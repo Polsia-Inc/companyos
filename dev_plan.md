@@ -101,17 +101,18 @@ Goal: Connect the agent to the context and enable context updates via the Pulse 
     *   ✅ Update agent prompt logic (within the orchestrator or agent files) to optionally inject content from `company/summary.md` into prompts based on agent type or configuration.
 6.  **✅ Verify Orchestrator Run:** (Implicitly done via successful `npm run start:orchestrator`)
 
-## Phase 4: Expansion & Refinement (Completing MVP)
+## Phase 4: Expansion & Refinement (Completing MVP) ✅
 
-Goal: Implement remaining MVP agents, refine core components, and add basic project setup.
+Goal: Implement remaining MVP agents, refine core components, and add basic project setup. ✅
 
-1.  **Implement Remaining MVP Agents:**
-    *   Create and implement `src/agents/ethicsAgent.ts` and `src/agents/wellnessAgent.ts`, following the same pattern as `strategyAgent` (using LLM integration and logging).
-2.  **Update Orchestrator:**
-    *   Modify `runAllAgents.ts` to sequentially run all implemented agents (`strategy`, `ethics`, `wellness`).
-    *   Aggregate the responses from all agents into the single timestamped output JSON file.
-3.  **Refine Agent Logic & Input Types:**
-    *   Update the input type definition used by agents (e.g., `AgentInput` in `types.ts`) to accept the richer context:
+1.  **✅ Implement Remaining MVP Agents:**
+    *   ✅ Create and implement `src/agents/ethicsAgent.ts`, following the same pattern as `strategyAgent` (using LLM integration and logging).
+    *   ✅ Create and implement `src/agents/wellnessAgent.ts`, following the same pattern as `strategyAgent` (using LLM integration and logging).
+2.  **✅ Update Orchestrator:**
+    *   ✅ Modify `runAllAgents.ts` to sequentially run all implemented agents (`strategy`, `ethics`, `wellness`).
+    *   ✅ Aggregate the responses from all agents into the single timestamped output JSON file.
+3.  **✅ Refine Agent Logic & Input Types:**
+    *   ✅ Update the input type definition used by agents (e.g., `AgentInput` in `types.ts`) to accept the richer context:
         ```ts
         type AgentInput = {
           currentPulse: Context;
@@ -119,28 +120,21 @@ Goal: Implement remaining MVP agents, refine core components, and add basic proj
           companyDocs?: { summary: string; /* other fields as needed */ };
         }
         ```
-    *   Improve prompt engineering for all agents, making use of the new historical and company context.
-    *   Enhance response parsing and error handling.
-4.  **Enhance Pulse Script:**
-    *   Improve `src/pulse/runPulse.ts` user experience (e.g., potentially loading the template, better input validation).
-    *   Add basic input validation logic.
-5.  **Populate `package.json` & Define Scripts:**
-    *   Ensure all necessary dependencies (e.g., LLM SDKs, `dotenv`, `typescript`, `@types/node`, potentially `inquirer`) are listed.
-    *   Define basic npm scripts:
+    *   ✅ Improve prompt engineering for all agents, making use of the new historical and company context.
+    *   ✅ Enhance response parsing and error handling.
+4.  **✅ Enhance Pulse Script:**
+    *   ✅ Improve `src/pulse/runPulse.ts` user experience (e.g., potentially loading the template, better input validation).
+    *   ✅ Add basic input validation logic.
+5.  **✅ Populate `package.json` & Define Scripts:**
+    *   ✅ Ensure all necessary dependencies (e.g., LLM SDKs, `dotenv`, `typescript`, `@types/node`, potentially `inquirer`) are listed.
+    *   ✅ Define basic npm scripts:
         *   `"build": "tsc"`
         *   `"start:pulse": "node dist/pulse/runPulse.js"` (or `ts-node src/pulse/runPulse.ts` for dev)
         *   `"start:orchestrator": "node dist/orchestrator/runAllAgents.js"` (or `ts-node src/orchestrator/runAllAgents.ts` for dev)
-6.  **Update `README.md`:**
-    *   Add instructions for setup (installing dependencies, setting API keys).
-    *   Add instructions for running the Pulse and Orchestrator scripts.
-    *   Outline steps for implementing features listed in "Future Extensions":
-        *   Web UI Development
-        *   Slack Integration
-        *   Multi-Org Support
-        *   Agent Memory/Scoring
-        *   Pulse Analytics
-        *   Public API
-        *   Configuration File (`companyos.config.json`): Introduce a configuration file to manage settings like org name, active agents, default LLM, etc.
+6.  **✅ Update `README.md`:**
+    *   ✅ Add instructions for setup (installing dependencies, setting API keys).
+    *   ✅ Add instructions for running the Pulse and Orchestrator scripts.
+    *   ✅ Document required environment variables (e.g., `OPENAI_API_KEY`) and how to set them (e.g., using a `.env` file).
 
 ## Phase 5: Future Considerations (Post-MVP)
 

@@ -2,6 +2,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import { AgentInput, AgentResponse, Context } from '../types.js';
 import { runStrategyAgent } from '../agents/strategyAgent.js';
+import { runEthicsAgent } from '../agents/ethicsAgent.js';
+import { runWellnessAgent } from '../agents/wellnessAgent.js';
 
 const CONTEXT_DIR = 'context';
 const OUTPUTS_DIR = 'outputs';
@@ -117,19 +119,41 @@ async function runOrchestrator() {
         companyDocs: companySummary ? { summary: companySummary } : undefined,
     };
 
-    // 3. Run Agents (starting with Strategy)
+    // 3. Run Agents (Updated to run all MVP agents)
     const agentResponses: AgentResponse[] = [];
+    
+    // Run Strategy Agent
     try {
         console.log("\n--- Running Strategy Agent ---");
         const strategyResponse = await runStrategyAgent(agentInput);
         agentResponses.push(strategyResponse);
-        console.log("--- Strategy Agent Complete ---\n");
+        console.log("--- Strategy Agent Complete ---");
     } catch (error) {
         console.error("Error running Strategy Agent:", error);
-        // Decide if we should continue with other agents or exit
+        agentResponses.push({ agent: "strategy", recommendations: ["Agent failed to run."], confidence: 0.0 });
     }
 
-    // (Future: Run other agents like Ethics, Wellness)
+    // Run Ethics Agent
+    try {
+        console.log("\n--- Running Ethics Agent ---");
+        const ethicsResponse = await runEthicsAgent(agentInput);
+        agentResponses.push(ethicsResponse);
+        console.log("--- Ethics Agent Complete ---");
+    } catch (error) {
+        console.error("Error running Ethics Agent:", error);
+        agentResponses.push({ agent: "ethics", recommendations: ["Agent failed to run."], confidence: 0.0 });
+    }
+
+    // Run Wellness Agent
+    try {
+        console.log("\n--- Running Wellness Agent ---");
+        const wellnessResponse = await runWellnessAgent(agentInput);
+        agentResponses.push(wellnessResponse);
+        console.log("--- Wellness Agent Complete ---\n");
+    } catch (error) {
+        console.error("Error running Wellness Agent:", error);
+        agentResponses.push({ agent: "wellness", recommendations: ["Agent failed to run."], confidence: 0.0 });
+    }
 
     // 4. Format and Save Output
     const outputDate = new Date().toISOString().split('T')[0];

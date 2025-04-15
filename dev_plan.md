@@ -2,55 +2,58 @@
 
 This document outlines the phased development plan for building the Minimum Viable Product (MVP) of CompanyOS v0.1, the CLI/Node-based version.
 
-## Phase 1: Foundation & Core Structure
+## Phase 1: Foundation & Core Structure ✅
 
-Goal: Set up the basic project structure, static content, and TypeScript configuration.
+Goal: Set up the basic project structure, static content, and TypeScript configuration. ✅
 
-1.  **Scaffold Repository:**
-    *   Create the main `companyos/` directory.
-    *   Create `src/` directory for TypeScript code.
-    *   Create subdirectories: `src/agents/`, `src/pulse/`, `src/orchestrator/`, `src/utils/`.
-    *   Create top-level directories: `context/`, `governance/`, `constitution/`, `pulse/` (for template), `orchestrator/` (for scripts if not directly run via node/ts-node), `outputs/`, `prompts/`, `company/`.
-    *   Create initial `README.md` and `package.json` files.
-    *   Create `.gitignore` file (add `node_modules/`, `dist/`, `.env`, `outputs/`, etc.).
-2.  **TypeScript Setup:**
-    *   Initialize TypeScript configuration: `npm install -D typescript @types/node`
-    *   Create `tsconfig.json` with appropriate settings (e.g., target ES2020+, module NodeNext, outDir `dist/`, sourceMap true, rootDir `src/`).
-3.  **Create Sample Context:**
-    *   Create `context/context.json` with the example structure provided, representing the initial state.
-4.  **Add Static Documents:**
-    *   Create `governance/governance.md` and populate it with the described roles, decision classes, and rules (can be refined later).
-    *   Create `constitution/constitution.md` and populate it with the purpose, vision, and values (can be refined later).
-5.  **Create Pulse Template:**
-    *   Create `pulse/pulse-template.md` with the structure for the daily check-in.
-6.  **Define Core Types:**
-    *   Create `src/types.ts`.
-    *   Define shared TypeScript types for `Context` and `AgentResponse` to ensure consistency across modules.
+1.  **✅ Scaffold Repository:**
+    *   ✅ Create the main `companyos/` directory.
+    *   ✅ Create `src/` directory for TypeScript code.
+    *   ✅ Create subdirectories: `src/agents/`, `src/pulse/`, `src/orchestrator/`, `src/utils/`.
+    *   ✅ Create top-level directories: `context/`, `governance/`, `constitution/`, `pulse/` (for template), `orchestrator/` (for scripts if not directly run via node/ts-node), `outputs/`, `prompts/`, `company/`.
+    *   ✅ Create initial `README.md` and `package.json` files.
+    *   ✅ Create `.gitignore` file (add `node_modules/`, `dist/`, `.env`, `outputs/`, etc.).
+2.  **✅ TypeScript Setup:**
+    *   ✅ Initialize TypeScript configuration: `npm install -D typescript @types/node`
+    *   ✅ Create `tsconfig.json` with appropriate settings (e.g., target ES2020+, module NodeNext, outDir `dist/`, sourceMap true, rootDir `src/`).
+3.  **✅ Create Sample Context:**
+    *   ✅ Create `context/context.json` with the example structure provided, representing the initial state.
+4.  **✅ Add Static Documents:**
+    *   ✅ Create `governance/governance.md` and populate it with the described roles, decision classes, and rules (can be refined later).
+    *   ✅ Create `constitution/constitution.md` and populate it with the purpose, vision, and values (can be refined later).
+5.  **✅ Create Pulse Template:**
+    *   ✅ Create `pulse/pulse-template.md` with the structure for the daily check-in.
+6.  **✅ Define Core Types:**
+    *   ✅ Create `src/types.ts`.
+    *   ✅ Define shared TypeScript types for `Context` and `AgentResponse` to ensure consistency across modules.
+7.  **✅ Verify Setup:** (Added Step)
+    *   ✅ Run `npm run build` to test TypeScript compilation.
 
-## Phase 2: Agent Implementation (MVP)
+## Phase 2: Agent Implementation (MVP) ✅
 
-Goal: Implement the first agent and basic LLM integration.
+Goal: Implement the first agent and basic LLM integration. ✅
 
-1.  **Implement `strategyAgent.ts`:**
-    *   Create `src/agents/strategyAgent.ts`.
-    *   Define the `runStrategyAgent` function interface accepting `Context` (import from `src/types.ts`).
-    *   Initially, implement dummy logic that returns the specified `AgentResponse` JSON structure.
-2.  **Set Up LLM Integration:**
-    *   Create `src/utils/llm.ts` for calling a chosen LLM API (e.g., OpenAI, Claude, Gemini).
-    *   *(Refinement: Design the utility to support configuration-based selection between different LLMs for future portability, even if starting with one.)*
-    *   Install required SDKs and `dotenv`: `npm install <llm-sdk> dotenv`
-    *   Implement handling of API keys via environment variables (`.env` file and `dotenv`).
-    *   Define basic prompt construction logic.
+1.  **✅ Implement `strategyAgent.ts`:**
+    *   ✅ Create `src/agents/strategyAgent.ts`.
+    *   ✅ Define the `runStrategyAgent` function interface accepting `Context` (import from `src/types.ts`).
+    *   ✅ Initially, implement dummy logic that returns the specified `AgentResponse` JSON structure.
+2.  **✅ Set Up LLM Integration:**
+    *   ✅ Create `src/utils/llm.ts` for calling a chosen LLM API (e.g., OpenAI, Claude, Gemini).
+    *   ✅ *(Refinement: Design the utility to support configuration-based selection between different LLMs for future portability, even if starting with one.)*
+    *   ✅ Install required SDKs and `dotenv`: `npm install openai dotenv`
+    *   ✅ Implement handling of API keys via environment variables (`.env` file and `dotenv`).
+    *   ✅ Define basic prompt construction logic.
+    *   ✅ Create `.env.example`.
 3.  **Set Up Basic Logging (Optional):**
-    *   *(Consider if needed for MVP: If simple `console.log` is sufficient initially, skip creating a dedicated `src/utils/logger.ts` until Phase 4/5)*.
+    *   *(Consider if needed for MVP: If simple `console.log` is sufficient initially, skip creating a dedicated `src/utils/logger.ts` until Phase 4/5)*. (Decided to skip for now)
     *   If implementing: Create `src/utils/logger.ts` (can start with simple `console.log` wrappers or use a library like `pino`).
     *   Integrate basic logging (info, error) into `src/utils/llm.ts` and the initial agent logic.
-4.  **Integrate LLM into `strategyAgent`:**
-    *   Update `runStrategyAgent` to:
-        *   Construct a prompt using the input `Context`.
-        *   Call the LLM API via the integration utility.
-        *   Parse the LLM response into the required `AgentResponse` JSON structure.
-        *   Include basic error handling.
+4.  **✅ Integrate LLM into `strategyAgent`:**
+    *   ✅ Update `runStrategyAgent` to:
+        *   ✅ Construct a prompt using the input `Context`.
+        *   ✅ Call the LLM API via the integration utility (`callLLM`).
+        *   ✅ Parse the LLM response into the required `AgentResponse` JSON structure (using basic string parsing for now).
+        *   ✅ Include basic error handling.
 
 ## Phase 3: Orchestration & Input System
 

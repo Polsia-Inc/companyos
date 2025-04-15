@@ -228,6 +228,15 @@ async function runOrchestrator() {
         };
         chiefOfStaffDirective = await runChiefOfStaffAgent(chiefOfStaffInput);
         console.log(`--- Chief of Staff Agent Complete ---`);
+
+        // Print the formatted directive to the console
+        if (chiefOfStaffDirective && typeof chiefOfStaffDirective === 'string') {
+            console.log("\n====== 🧠 Chief of Staff Summary ======");
+            console.log(chiefOfStaffDirective.trim()); // Trim to remove leading/trailing whitespace
+            console.log("====================================\n");
+        } else {
+             console.log("\nChief of Staff directive was not generated or is not a string.\n");
+        }
     } catch (error) {
         console.error(`Error running Chief of Staff Agent:`, error);
         chiefOfStaffDirective = `Chief of Staff Agent failed to run: ${error instanceof Error ? error.message : String(error)}`;
@@ -273,6 +282,19 @@ async function runOrchestrator() {
         console.log(`Successfully wrote output to ${outputFilePath}`);
     } catch (error) {
         console.error(`Error writing output file ${outputFilePath}:`, error);
+    }
+
+    // Write the Chief of Staff summary to a separate Markdown file
+    if (chiefOfStaffDirective && typeof chiefOfStaffDirective === 'string') {
+        const summaryFilePath = path.join(OUTPUTS_DIR, `${outputDate}.summary.md`);
+        try {
+            await fs.writeFile(summaryFilePath, chiefOfStaffDirective);
+            console.log(`Successfully wrote summary to ${summaryFilePath}`);
+        } catch (summaryWriteError) {
+            console.error(`Error writing summary file ${summaryFilePath}:`, summaryWriteError);
+        }
+    } else {
+        console.warn("Skipping summary file write because Chief of Staff directive was not available.");
     }
 
     // 5. Optional Feedback Loop

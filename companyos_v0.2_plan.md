@@ -79,9 +79,9 @@ This plan focuses on making CompanyOS a living operating layer that synthesizes,
 
 **Goal:** Improve the usability of the output and ensure the file structure is correct.
 
-1.  **Enhance Terminal Output:**
-    *   Ensure individual agent outputs are displayed clearly during the run (if desired).
-    *   Implement the final formatted "Chief of Staff Summary" block to be printed at the end of the execution.
+1.  ✅ **Enhance Terminal Output:**
+    *   ✅ Ensure individual agent outputs are displayed clearly during the run (if desired).
+    *   ✅ Implement the final formatted "Chief of Staff Summary" block to be printed at the end of the execution (`src/orchestrator/runAllAgents.ts`).
     ```txt
     ====== 🧠 Chief of Staff Summary ======
     TODAY'S DIRECTIVE:
@@ -101,10 +101,10 @@ This plan focuses on making CompanyOS a living operating layer that synthesizes,
     Confidence: 0.92
     =====================================
     ```
-2.  **Implement Summary File Output:**
-    *   Save the Chief of Staff agent's structured summary to `outputs/YYYY-MM-DD.summary.md`.
-3.  **Verify Final Directory Structure:**
-    *   Confirm all new files and directories match the target structure:
+2.  ✅ **Implement Summary File Output:**
+    *   ✅ Save the Chief of Staff agent's structured summary string to `outputs/YYYY-MM-DD.summary.md` (`src/orchestrator/runAllAgents.ts`).
+3.  ✅ **Verify Final Directory Structure:**
+    *   ✅ Confirm all new files and directories match the target structure:
     ```
     companyos/
     ├── prompts/

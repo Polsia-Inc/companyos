@@ -20,4 +20,5 @@ export type AgentInput = {
     currentPulse: Context;
     pulseHistory?: Context[]; // Array of past Context objects
     companyDocs?: { summary: string; /* other fields as needed */ };
+    otherAgentReports?: { [key: string]: string | AgentResponse }; // Add outputs from previous agents
 };

@@ -4,6 +4,9 @@ import { AgentInput, AgentResponse, Context } from '../types.js';
 import { runStrategyAgent } from '../agents/strategyAgent.js';
 import { runEthicsAgent } from '../agents/ethicsAgent.js';
 import { runWellnessAgent } from '../agents/wellnessAgent.js';
+import { runProductAgent } from '../agents/productAgent.js';
+import { runEngineeringAgent } from '../agents/engineeringAgent.js';
+import { runMarketingAgent } from '../agents/marketingAgent.js';
 
 const CONTEXT_DIR = 'context';
 const OUTPUTS_DIR = 'outputs';
@@ -119,40 +122,45 @@ async function runOrchestrator() {
         companyDocs: companySummary ? { summary: companySummary } : undefined,
     };
 
-    // 3. Run Agents (Updated to run all MVP agents)
-    const agentResponses: AgentResponse[] = [];
-    
-    // Run Strategy Agent
-    try {
-        console.log("\n--- Running Strategy Agent ---");
-        const strategyResponse = await runStrategyAgent(agentInput);
-        agentResponses.push(strategyResponse);
-        console.log("--- Strategy Agent Complete ---");
-    } catch (error) {
-        console.error("Error running Strategy Agent:", error);
-        agentResponses.push({ agent: "strategy", recommendations: ["Agent failed to run."], confidence: 0.0 });
-    }
+    // 3. Run Agents (Updated to run all Tier 1 agents sequentially)
+    const agentResponses: { [key: string]: string | AgentResponse } = {}; // Use object to store results keyed by agent name
 
-    // Run Ethics Agent
-    try {
-        console.log("\n--- Running Ethics Agent ---");
-        const ethicsResponse = await runEthicsAgent(agentInput);
-        agentResponses.push(ethicsResponse);
-        console.log("--- Ethics Agent Complete ---");
-    } catch (error) {
-        console.error("Error running Ethics Agent:", error);
-        agentResponses.push({ agent: "ethics", recommendations: ["Agent failed to run."], confidence: 0.0 });
-    }
+    // Helper to run an agent and store its result or error
+    const runAgent = async (name: string, agentFn: (input: AgentInput) => Promise<string | AgentResponse>) => {
+        try {
+            console.log(`\n--- Running ${name} Agent ---`);
+            const response = await agentFn(agentInput);
+            agentResponses[name.toLowerCase()] = response; // Store response keyed by lowercase name
+            console.log(`--- ${name} Agent Complete ---`);
+        } catch (error) {
+            console.error(`Error running ${name} Agent:`, error);
+            // Store a simplified error object or message
+            agentResponses[name.toLowerCase()] = `Agent ${name} failed to run: ${error instanceof Error ? error.message : String(error)}`;
+        }
+    };
 
-    // Run Wellness Agent
-    try {
-        console.log("\n--- Running Wellness Agent ---");
-        const wellnessResponse = await runWellnessAgent(agentInput);
-        agentResponses.push(wellnessResponse);
-        console.log("--- Wellness Agent Complete ---\n");
-    } catch (error) {
-        console.error("Error running Wellness Agent:", error);
-        agentResponses.push({ agent: "wellness", recommendations: ["Agent failed to run."], confidence: 0.0 });
+    // Define agents to run in order
+    const agentsToRun: { name: string; runner: (input: AgentInput) => Promise<string | AgentResponse> }[] = [
+        { name: 'Strategy', runner: runStrategyAgent },
+        { name: 'Ethics', runner: runEthicsAgent },
+        { name: 'Wellness', runner: runWellnessAgent },
+        { name: 'Product', runner: runProductAgent }, // Add new agent
+        { name: 'Engineering', runner: runEngineeringAgent }, // Add new agent
+        { name: 'Marketing', runner: runMarketingAgent }, // Add new agent
+    ];
+
+    // Run agents sequentially and collect responses
+    for (const agent of agentsToRun) {
+        // Pass the current set of responses to the next agent
+        // NOTE: The placeholder AgentInput in new agents might need adjustment
+        // if they expect the specific AgentResponse type from existing agents.
+        // For now, passing all collected string/AgentResponse objects.
+        const currentInput = {
+             ...agentInput,
+             // Pass previous agent outputs if needed (adapt AgentInput interface accordingly)
+             // Example: otherAgentReports: agentResponses
+        };
+        await runAgent(agent.name, agent.runner);
     }
 
     // 4. Format and Save Output
@@ -166,10 +174,7 @@ async function runOrchestrator() {
             pulseHistoryCount: pulseHistory.length,
             companySummaryLoaded: !!companySummary,
         },
-        responses: agentResponses.reduce((acc, res) => {
-            acc[res.agent] = res; // Group responses by agent name
-            return acc;
-        }, {} as { [key: string]: AgentResponse }),
+        responses: agentResponses, // Directly use the collected responses object
         creative_director_input: { // Placeholder
             notes: null,
             manual_overrides: {},

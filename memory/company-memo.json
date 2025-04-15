@@ -1,22 +1,43 @@
 {
   "version": "0.1",
-  "description": "A simple, evolving memory store for CompanyOS. Initially focused on weekly summaries.",
+  "description": "Blanks company memory — updated weekly to reflect major shifts, decisions, and values.",
   "weekly_summaries": [
     {
-      "week_ending_date": "YYYY-MM-DD",
-      "summary_content": "Placeholder summary for the week. Could be generated manually or via LLM.",
+      "week_ending_date": "2025-04-14",
+      "summary_content": "Blanks TestFlight MVP nearly ready. Core UX and voice input working. App generation flow mostly functional. Key bottlenecks: LLM chaining inconsistency and slow Metro bundling on Render.",
       "key_decisions": [
-        "Placeholder decision 1"
+        "Use GPT-4.1 as primary codegen model with fallback to Claude",
+        "Block TestFlight rollout until Metro build time is under 30s"
       ],
       "learnings": [
-        "Placeholder learning 1"
+        "Even simple app requests (e.g., Hello World) can fail with too much model fallback logic",
+        "Users are excited by the orb interaction but confused post-recording"
+      ]
+    },
+    {
+      "week_ending_date": "2025-04-21",
+      "summary_content": "App generation pipeline stabilized. Remixed apps tested. Added suggested edits and retry logic. Focus shifted toward shipping an emotionally delightful onboarding experience.",
+      "key_decisions": [
+        "Keep the app fully voice-first, but allow optional text fallback",
+        "Delay sharing/discovery features until core generation UX is clean"
+      ],
+      "learnings": [
+        "Users need to feel progress during generation — otherwise, the magic breaks",
+        "Remix flow needs clear signposting — most testers didn’t understand what it was"
       ]
     }
   ],
   "long_term_goals": [
-    "Placeholder long-term goal 1"
+    "Launch Blanks publicly with a magical, voice-first experience",
+    "Enable anyone to create apps without knowing how to code",
+    "Evolve the orb into a central emotional UI anchor — a creative collaborator",
+    "Build a library of remixable mini-apps that feel like personal universes"
   ],
   "core_values": [
-    "Placeholder core value 1"
+    "Feel over features",
+    "Magic through simplicity",
+    "Users first, even before code",
+    "Delight is traction",
+    "Every tab is a world"
   ]
-} 
+}

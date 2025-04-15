@@ -127,6 +127,39 @@ async function loadCompanyMemo(): Promise<object | null> {
 }
 
 /**
+ * Formats agent output for display (used by feedback loop and final printout).
+ * @param agentName The name of the agent.
+ * @param agentOutput The output (string or AgentResponse).
+ * @returns A formatted string snippet.
+ */
+function formatAgentOutputSnippet(agentName: string, agentOutput: string | AgentResponse | null): string {
+    let outputSnippet = 'No output or failed.';
+    const maxSnippetLength = 1000; // Keep consistent length for now
+
+    if (typeof agentOutput === 'string') {
+        // If it's the CoS directive string, show it directly (handled separately now)
+        // Treat other strings as potential errors or raw output
+        outputSnippet = agentOutput;
+    } else if (agentOutput && typeof agentOutput === 'object') {
+        let formatted = `Agent: ${agentOutput.agent}\n`;
+        if (agentOutput.recommendations && agentOutput.recommendations.length > 0) {
+            formatted += `Recommendations:\n${agentOutput.recommendations.map(r => `  - ${r}`).join('\n')}\n`;
+        }
+        if (agentOutput.concerns && agentOutput.concerns.length > 0) {
+            formatted += `Concerns:\n${agentOutput.concerns.map(c => `  - ${c}`).join('\n')}\n`;
+        }
+        if (agentOutput.flags && agentOutput.flags.length > 0) {
+            formatted += `Flags:\n${agentOutput.flags.map(f => `  - ${f}`).join('\n')}\n`;
+        }
+        if (agentOutput.confidence !== undefined) {
+             formatted += `Confidence: ${agentOutput.confidence}`;
+        }
+        outputSnippet = formatted.trim();
+    }
+    return outputSnippet;
+}
+
+/**
  * Prompts the user for feedback on agent outputs.
  * @param agentName The name of the agent being reviewed.
  * @param agentOutput The output produced by the agent (string or object).
@@ -135,14 +168,8 @@ async function loadCompanyMemo(): Promise<object | null> {
  */
 async function getFeedbackForAgent(agentName: string, agentOutput: string | AgentResponse | null, rl: readline.Interface): Promise<{ rating: number | null; notes: string | null }> {
     console.log(`\n--- Reviewing ${agentName} Agent ---`);
-    // Display output snippet for context (adjust snippet logic as needed)
-    let outputSnippet = 'No output or failed.';
-    if (typeof agentOutput === 'string') {
-        outputSnippet = agentOutput.substring(0, 300) + (agentOutput.length > 300 ? '...' : '');
-    } else if (agentOutput && typeof agentOutput === 'object') {
-        // Handle AgentResponse object - maybe show recommendations?
-        outputSnippet = JSON.stringify(agentOutput.recommendations || agentOutput.flags || agentOutput.concerns || 'No specific items found').substring(0, 300) + '...';
-    }
+    // Use the refactored formatting function for the snippet
+    const outputSnippet = formatAgentOutputSnippet(agentName, agentOutput);
     console.log(`Output Snippet:\n${outputSnippet}`);
 
     let rating: number | null = null;
@@ -241,6 +268,16 @@ async function runOrchestrator() {
         console.error(`Error running Chief of Staff Agent:`, error);
         chiefOfStaffDirective = `Chief of Staff Agent failed to run: ${error instanceof Error ? error.message : String(error)}`;
     }
+
+    // Print individual agent outputs after the CoS summary
+    console.log("\n====== 🕵️ Individual Agent Outputs ====== ");
+    for (const agentName in agentResponses) {
+        // Use the same formatting function as the feedback loop
+        const formattedOutput = formatAgentOutputSnippet(agentName, agentResponses[agentName]);
+        console.log(`\n--- ${agentName.charAt(0).toUpperCase() + agentName.slice(1)} Agent ---`);
+        console.log(formattedOutput);
+    }
+    console.log("========================================\n");
 
     // 4. Format and Save Output
     const outputDate = new Date().toISOString().split('T')[0];

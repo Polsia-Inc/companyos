@@ -1,0 +1,23 @@
+{
+    "Strategy": {
+        "enabled": true
+    },
+    "Ethics": {
+        "enabled": true
+    },
+    "Wellness": {
+        "enabled": true
+    },
+    "Product": {
+        "enabled": true
+    },
+    "Engineering": {
+        "enabled": true
+    },
+    "Marketing": {
+        "enabled": true
+    },
+    "ChiefOfStaff": {
+        "enabled": true
+    }
+} 

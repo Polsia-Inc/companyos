@@ -31,6 +31,12 @@ const INITIAL_CONTEXT_FILE = path.join(CONTEXT_DIR, 'context.json');
 const COMPANY_SUMMARY_FILE = path.join(COMPANY_DIR, 'summary.md');
 const COMPANY_MEMO_FILE = path.join(MEMORY_DIR, 'company-memo.json');
 const PULSE_HISTORY_DAYS = 7; // Load last 7 days of history
+const AGENT_CONFIG_FILE = path.join('config', 'agents.json'); // Path to new config file
+
+// Define a type for the agent configuration
+type AgentConfig = {
+    [agentName: string]: { enabled: boolean };
+};
 
 /**
  * Loads the most recent pulse context.
@@ -138,18 +144,45 @@ async function loadCompanyMemo(): Promise<object | null> {
 }
 
 /**
- * Main orchestrator function - Refactored for v0.2.5 Phase 1.
+ * Loads the agent configuration from config/agents.json
+ * @returns The AgentConfig object or null if file not found/invalid.
+ */
+async function loadAgentConfig(): Promise<AgentConfig | null> {
+    try {
+        const configContent = await fs.readFile(AGENT_CONFIG_FILE, 'utf-8');
+        console.log(`Loaded agent configuration from ${AGENT_CONFIG_FILE}`);
+        return JSON.parse(configContent) as AgentConfig;
+    } catch (error: any) {
+        if (error.code === 'ENOENT') {
+            console.error(`Error: Agent configuration file not found at ${AGENT_CONFIG_FILE}. Please create it.`);
+        } else if (error instanceof SyntaxError) {
+             console.error(`Error parsing JSON from ${AGENT_CONFIG_FILE}:`, error);
+        } else {
+            console.error(`Error reading ${AGENT_CONFIG_FILE}:`, error);
+        }
+        return null;
+    }
+}
+
+/**
+ * Main orchestrator function - Refactored for v0.2.5 Phase 3.
  */
 async function runOrchestrator() {
     console.log("Starting Orchestrator v0.2.5...");
 
-    // 1. Load Context (Same as v0.2)
+    // 0. Load Agent Configuration
+    const agentConfig = await loadAgentConfig();
+    if (!agentConfig) {
+        console.error("Failed to load agent configuration. Exiting.");
+        return;
+    }
+
+    // 1. Load Context 
     const currentPulse = await loadCurrentPulse();
     if (!currentPulse) {
         console.error("Failed to load current pulse context. Exiting.");
         return;
     }
-
     const pulseHistory = await loadPulseHistory(PULSE_HISTORY_DAYS);
     const companySummary = await loadCompanySummary();
     const companyMemo = await loadCompanyMemo();
@@ -162,139 +195,124 @@ async function runOrchestrator() {
         companyMemo: companyMemo ?? undefined, // Pass memo if loaded
     };
 
-    // 3. Define Agents for Interactive Loop
-    // TODO: Later, load this dynamically based on config (Phase 3)
-    const agents = [
-        {
-            name: 'Strategy',
-            getBrief: getStrategyAgentBrief,
-            getReply: getStrategyAgentReply,
-        },
-        {
-            name: 'Ethics',
-            getBrief: getEthicsAgentBrief,
-            getReply: getEthicsAgentReply,
-        },
-        {
-            name: 'Wellness',
-            getBrief: getWellnessAgentBrief,
-            getReply: getWellnessAgentReply,
-        },
-        {
-            name: 'Product',
-            getBrief: getProductAgentBrief,
-            getReply: getProductAgentReply,
-        },
-        {
-            name: 'Engineering',
-            getBrief: getEngineeringAgentBrief,
-            getReply: getEngineeringAgentReply,
-        },
-        {
-            name: 'Marketing',
-            getBrief: getMarketingAgentBrief,
-            getReply: getMarketingAgentReply,
-        },
-        // Add other agents here as they are refactored/created
+    // 3. Define *Available* Agents 
+    const allAvailableAgents = [
+        { name: 'Strategy', getBrief: getStrategyAgentBrief, getReply: getStrategyAgentReply },
+        { name: 'Ethics', getBrief: getEthicsAgentBrief, getReply: getEthicsAgentReply },
+        { name: 'Wellness', getBrief: getWellnessAgentBrief, getReply: getWellnessAgentReply },
+        { name: 'Product', getBrief: getProductAgentBrief, getReply: getProductAgentReply },
+        { name: 'Engineering', getBrief: getEngineeringAgentBrief, getReply: getEngineeringAgentReply },
+        { name: 'Marketing', getBrief: getMarketingAgentBrief, getReply: getMarketingAgentReply },
     ];
 
-    // 4. Initialize Interaction History (for Phase 2)
+    // Filter agents based on the loaded configuration
+    const enabledAgents = allAvailableAgents.filter(agent => 
+        agentConfig[agent.name]?.enabled === true
+    );
+
+    if (enabledAgents.length === 0) {
+        console.log("No agents enabled in configuration. Skipping one-on-one interactions.");
+    } else {
+        console.log(`Enabled agents for one-on-one: ${enabledAgents.map(a => a.name).join(', ')}`);
+    }
+
+    // 4. Initialize Interaction History
     const interactionHistory: AgentInteraction[] = [];
 
-    // 5. Run Interactive Agent Loop
+    // 5. Run Interactive Agent Loop (using *enabled* agents)
     console.log("\n====== 💬 Agent One-on-Ones ======");
-    for (const agent of agents) {
-        console.log(`\n--- Engaging ${agent.name} Agent ---`);
-        let currentInteraction: Partial<AgentInteraction> = { agentName: agent.name, skipped: false };
+    if (enabledAgents.length > 0) {
+        for (const agent of enabledAgents) { // Loop through FILTERED agents
+            console.log(`\n--- Engaging ${agent.name} Agent ---`);
+            let currentInteraction: Partial<AgentInteraction> = { agentName: agent.name, skipped: false };
 
-        try {
-            const brief: AgentBrief = await agent.getBrief(agentBriefInput);
-            currentInteraction.brief = brief;
-            console.log(`\n${agent.name} says:\n${brief}`);
+            try {
+                const brief: AgentBrief = await agent.getBrief(agentBriefInput);
+                currentInteraction.brief = brief;
+                console.log(`\n${agent.name} says:\n${brief}`);
 
-            const { action } = await inquirer.prompt([
-                {
-                    type: 'list',
-                    name: 'action',
-                    message: `Action for ${agent.name}?`,
-                    choices: [
-                        { name: 'Include these ideas, next agent', value: 'next' },
-                        { name: 'Respond (Provide feedback/question)', value: 'respond' },
-                        { name: "Don't include, skip agent", value: 'skip' },
-                    ],
-                },
-            ]);
-
-            if (action === 'skip') {
-                console.log(`Skipping ${agent.name} Agent.`);
-                currentInteraction.skipped = true;
-            } else if (action === 'respond') {
-                const { userResponse } = await inquirer.prompt([
+                const { action } = await inquirer.prompt([
                     {
-                        type: 'input',
-                        name: 'userResponse',
-                        message: `Your response to ${agent.name}:`,
+                        type: 'list',
+                        name: 'action',
+                        message: `Action for ${agent.name}?`,
+                        choices: [
+                            { name: 'Include these ideas, next agent', value: 'next' },
+                            { name: 'Respond (Provide feedback/question)', value: 'respond' },
+                            { name: "Don't include, skip agent", value: 'skip' }, 
+                        ],
                     },
                 ]);
-                currentInteraction.userResponse = userResponse as UserResponse;
 
-                if (userResponse) { // Only call reply if user actually responded
-                    const replyInput: AgentReplyInput = {
-                        ...agentBriefInput, // Pass base context
-                        initialBrief: brief,
-                        userResponse: userResponse,
-                    };
-                    const reply: AgentReply = await agent.getReply(replyInput);
-                    currentInteraction.agentReply = reply;
-                    console.log(`\n${agent.name} replies:\n${reply}`);
-                     // User sees reply, then implicitly moves to Next/Pass state
-                    console.log(`(Continuing to next agent...)`);
-                } else {
-                    console.log(`(No response provided, continuing...)`);
+                if (action === 'skip') {
+                    console.log(`Skipping ${agent.name} Agent.`);
+                    currentInteraction.skipped = true;
+                } else if (action === 'respond') {
+                    const { userResponse } = await inquirer.prompt([
+                        {
+                            type: 'input',
+                            name: 'userResponse',
+                            message: `Your response to ${agent.name}:`,
+                        },
+                    ]);
+                    currentInteraction.userResponse = userResponse as UserResponse;
+
+                    if (userResponse) { // Only call reply if user actually responded
+                        const replyInput: AgentReplyInput = {
+                            ...agentBriefInput, 
+                            initialBrief: brief,
+                            userResponse: userResponse,
+                        };
+                        const reply: AgentReply = await agent.getReply(replyInput);
+                        currentInteraction.agentReply = reply;
+                        console.log(`\n${agent.name} replies:\n${reply}`);
+                        console.log(`(Continuing to next agent...)`);
+                    } else {
+                        console.log(`(No response provided, continuing...)`);
+                    }
+
+                } else { // action === 'next'
+                    console.log(`Continuing past ${agent.name} Agent.`);
                 }
 
-            } else { // action === 'next'
-                console.log(`Continuing past ${agent.name} Agent.`);
-                // No userResponse or agentReply needed for 'next'
+            } catch (error) {
+                console.error(`Error interacting with ${agent.name} Agent:`, error);
+                currentInteraction.brief = currentInteraction.brief ?? `Error during ${agent.name} interaction.`;
+                currentInteraction.skipped = true; 
             }
-
-        } catch (error) {
-            console.error(`Error interacting with ${agent.name} Agent:`, error);
-            currentInteraction.brief = currentInteraction.brief ?? `Error during ${agent.name} interaction.`; // Add error note if brief failed
-            currentInteraction.skipped = true; // Treat errors as skips for now
+            interactionHistory.push(currentInteraction as AgentInteraction);
         }
-
-        // Add the completed interaction (even if skipped/error) to history
-        interactionHistory.push(currentInteraction as AgentInteraction);
-    }
+    } // End if enabledAgents.length > 0
     console.log("==================================\n");
 
-    // 6. Run Chief of Staff Synthesis (Phase 2)
-    console.log("\n--- Running Chief of Staff Synthesis ---");
+    // 6. Run Chief of Staff Synthesis (if enabled)
     let chiefOfStaffDirective: string | null = null;
-    try {
-        // Construct input for CoS agent, including interaction history
-        const chiefOfStaffInput: ChiefOfStaffInput = {
-            ...agentBriefInput, // Base context (pulse, history, docs, memo)
-            interactionHistory: interactionHistory,
-        };
-        chiefOfStaffDirective = await runChiefOfStaffAgent(chiefOfStaffInput);
+    if (agentConfig['ChiefOfStaff']?.enabled) {
+        console.log("\n--- Running Chief of Staff Synthesis ---");
+        try {
+            const chiefOfStaffInput: ChiefOfStaffInput = {
+                ...agentBriefInput, 
+                interactionHistory: interactionHistory, // Pass history from *enabled* agents only
+            };
+            chiefOfStaffDirective = await runChiefOfStaffAgent(chiefOfStaffInput);
 
-        // Print the formatted directive to the console
-        if (chiefOfStaffDirective && typeof chiefOfStaffDirective === 'string') {
-            console.log("\n====== 🧠 Chief of Staff Summary ======");
-            console.log(chiefOfStaffDirective.trim());
-            console.log("====================================\n");
-        } else {
-             console.log("\nChief of Staff directive was not generated or is not a string.\n");
+            if (chiefOfStaffDirective && typeof chiefOfStaffDirective === 'string') {
+                console.log("\n====== 🧠 Chief of Staff Summary ======");
+                console.log(chiefOfStaffDirective.trim());
+                console.log("====================================\n");
+            } else {
+                 console.log("\nChief of Staff directive was not generated or is not a string.\n");
+            }
+        } catch (error) {
+            console.error(`Error running Chief of Staff Agent:`, error);
+            chiefOfStaffDirective = `Chief of Staff Agent failed to run: ${error instanceof Error ? error.message : String(error)}`;
         }
-    } catch (error) {
-        console.error(`Error running Chief of Staff Agent:`, error);
-        chiefOfStaffDirective = `Chief of Staff Agent failed to run: ${error instanceof Error ? error.message : String(error)}`;
+    } else {
+        console.log("--- Chief of Staff Agent disabled in configuration. Skipping synthesis. ---");
     }
 
 
-    // 7. Save Outputs (Phase 2)
+    // 7. Save Outputs
     console.log("--- Saving Outputs ---");
     const outputDate = new Date().toISOString().split('T')[0];
     const outputFilenameJson = `${outputDate}.json`;
@@ -302,39 +320,39 @@ async function runOrchestrator() {
     const outputFilePathJson = path.join(OUTPUTS_DIR, outputFilenameJson);
     const outputFilePathMd = path.join(OUTPUTS_DIR, outputFilenameMd);
 
-    // Define the structure for the output data
     const outputData = {
         date: outputDate,
+        config_used: agentConfig, // Include config used for this run
         context_used: { 
              currentPulse: agentBriefInput.currentPulse,
              pulseHistoryCount: agentBriefInput.pulseHistory?.length ?? 0,
              companySummaryLoaded: !!agentBriefInput.companyDocs?.summary,
              companyMemoLoaded: !!agentBriefInput.companyMemo,
         },
-        interactions: interactionHistory, // Save the full interaction history
-        chief_of_staff_summary: chiefOfStaffDirective, // Save CoS output
+        interactions: interactionHistory, 
+        chief_of_staff_summary: chiefOfStaffDirective, 
     };
 
     try {
-        await fs.mkdir(OUTPUTS_DIR, { recursive: true }); // Ensure output directory exists
+        await fs.mkdir(OUTPUTS_DIR, { recursive: true });
         await fs.writeFile(outputFilePathJson, JSON.stringify(outputData, null, 2));
         console.log(`Successfully wrote detailed output to ${outputFilePathJson}`);
 
-        // Write the Chief of Staff summary to a separate Markdown file
-        if (chiefOfStaffDirective && typeof chiefOfStaffDirective === 'string') {
+        // Only write summary MD if CoS was enabled and produced output
+        if (agentConfig['ChiefOfStaff']?.enabled && chiefOfStaffDirective && typeof chiefOfStaffDirective === 'string') {
             await fs.writeFile(outputFilePathMd, chiefOfStaffDirective);
             console.log(`Successfully wrote summary to ${outputFilePathMd}`);
         } else {
-            console.warn(`Skipping summary file write because Chief of Staff directive was not available or not a string.`);
+            if (!agentConfig['ChiefOfStaff']?.enabled) {
+                 console.log(`Skipping summary file write because Chief of Staff agent was disabled.`);
+            } else {
+                 console.warn(`Skipping summary file write because Chief of Staff directive was not available or not a string.`);
+            }
         }
 
     } catch (error) {
         console.error(`Error writing output files:`, error);
     }
-
-    // 8. Feedback Loop (Removed in v0.2.5 as per PRD)
-    // console.log("--- Feedback Loop (Removed) ---");
-
 
     console.log("Orchestrator finished.");
 }

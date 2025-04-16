@@ -50,6 +50,15 @@ export type AgentReplyInput = {
     userResponse: UserResponse;
 };
 
+// Input for the Chief of Staff Agent (Phase 2)
+export type ChiefOfStaffInput = {
+    currentPulse: Context;
+    pulseHistory?: Context[]; 
+    companyDocs?: { summary: string };
+    companyMemo?: object;
+    interactionHistory: AgentInteraction[]; // Replaces otherAgentReports
+};
+
 // --- Deprecated / To be refactored --- 
 // Old AgentResponse type, keep temporarily if needed during refactor, rename to avoid conflict
 // export type AgentResponse = AgentStructuredResponse;

@@ -8,6 +8,7 @@ import {
     AgentBrief,
     AgentReply,
     UserResponse,
+    ChiefOfStaffInput,
     // AgentStructuredResponse // Keep if CoS needs it later, but not for phase 1 interaction loop
 } from '../types.js';
 import { getStrategyAgentBrief, getStrategyAgentReply } from '../agents/strategyAgent.js';
@@ -16,7 +17,7 @@ import { getWellnessAgentBrief, getWellnessAgentReply } from '../agents/wellness
 import { getProductAgentBrief, getProductAgentReply } from '../agents/productAgent.js';
 import { getEngineeringAgentBrief, getEngineeringAgentReply } from '../agents/engineeringAgent.js';
 import { getMarketingAgentBrief, getMarketingAgentReply } from '../agents/marketingAgent.js';
-// import { runChiefOfStaffAgent } from '../agents/chiefOfStaffAgent.js'; // Phase 2
+import { runChiefOfStaffAgent } from '../agents/chiefOfStaffAgent.js'; // Phase 2
 // import * as readline from 'node:readline/promises'; // No longer needed for feedback
 // import { stdin as input, stdout as output } from 'node:process'; // No longer needed for feedback
 import inquirer from 'inquirer'; // Import inquirer
@@ -269,31 +270,67 @@ async function runOrchestrator() {
     console.log("==================================\n");
 
     // 6. Run Chief of Staff Synthesis (Phase 2)
-    console.log("\n--- Chief of Staff Synthesis (Phase 2 - Not Implemented Yet) ---");
-    // TODO: Pass interactionHistory to ChiefOfStaffAgent
-    // const chiefOfStaffInput = { ...agentBriefInput, interactions: interactionHistory };
-    // const chiefOfStaffDirective = await runChiefOfStaffAgent(chiefOfStaffInput);
-    // console.log("\n====== 🧠 Chief of Staff Summary ======");
-    // console.log(chiefOfStaffDirective);
-    // console.log("====================================\n");
+    console.log("\n--- Running Chief of Staff Synthesis ---");
+    let chiefOfStaffDirective: string | null = null;
+    try {
+        // Construct input for CoS agent, including interaction history
+        const chiefOfStaffInput: ChiefOfStaffInput = {
+            ...agentBriefInput, // Base context (pulse, history, docs, memo)
+            interactionHistory: interactionHistory,
+        };
+        chiefOfStaffDirective = await runChiefOfStaffAgent(chiefOfStaffInput);
+
+        // Print the formatted directive to the console
+        if (chiefOfStaffDirective && typeof chiefOfStaffDirective === 'string') {
+            console.log("\n====== 🧠 Chief of Staff Summary ======");
+            console.log(chiefOfStaffDirective.trim());
+            console.log("====================================\n");
+        } else {
+             console.log("\nChief of Staff directive was not generated or is not a string.\n");
+        }
+    } catch (error) {
+        console.error(`Error running Chief of Staff Agent:`, error);
+        chiefOfStaffDirective = `Chief of Staff Agent failed to run: ${error instanceof Error ? error.message : String(error)}`;
+    }
+
 
     // 7. Save Outputs (Phase 2)
-    console.log("--- Output Saving (Phase 2 - Not Implemented Yet) ---");
-    // TODO: Save interactionHistory and CoS summary to JSON/MD files
-    /*
+    console.log("--- Saving Outputs ---");
     const outputDate = new Date().toISOString().split('T')[0];
-    const outputFilePath = path.join(OUTPUTS_DIR, `${outputDate}.json`);
+    const outputFilenameJson = `${outputDate}.json`;
+    const outputFilenameMd = `${outputDate}.summary.md`;
+    const outputFilePathJson = path.join(OUTPUTS_DIR, outputFilenameJson);
+    const outputFilePathMd = path.join(OUTPUTS_DIR, outputFilenameMd);
+
+    // Define the structure for the output data
     const outputData = {
         date: outputDate,
-        context_used: { ... }, // Summary of context used
-        interactions: interactionHistory, // Save the new structure
+        context_used: { 
+             currentPulse: agentBriefInput.currentPulse,
+             pulseHistoryCount: agentBriefInput.pulseHistory?.length ?? 0,
+             companySummaryLoaded: !!agentBriefInput.companyDocs?.summary,
+             companyMemoLoaded: !!agentBriefInput.companyMemo,
+        },
+        interactions: interactionHistory, // Save the full interaction history
         chief_of_staff_summary: chiefOfStaffDirective, // Save CoS output
     };
-    await fs.mkdir(OUTPUTS_DIR, { recursive: true });
-    await fs.writeFile(outputFilePath, JSON.stringify(outputData, null, 2));
-    console.log(`Saved output to ${outputFilePath}`);
-    // Also save summary MD if needed
-    */
+
+    try {
+        await fs.mkdir(OUTPUTS_DIR, { recursive: true }); // Ensure output directory exists
+        await fs.writeFile(outputFilePathJson, JSON.stringify(outputData, null, 2));
+        console.log(`Successfully wrote detailed output to ${outputFilePathJson}`);
+
+        // Write the Chief of Staff summary to a separate Markdown file
+        if (chiefOfStaffDirective && typeof chiefOfStaffDirective === 'string') {
+            await fs.writeFile(outputFilePathMd, chiefOfStaffDirective);
+            console.log(`Successfully wrote summary to ${outputFilePathMd}`);
+        } else {
+            console.warn(`Skipping summary file write because Chief of Staff directive was not available or not a string.`);
+        }
+
+    } catch (error) {
+        console.error(`Error writing output files:`, error);
+    }
 
     // 8. Feedback Loop (Removed in v0.2.5 as per PRD)
     // console.log("--- Feedback Loop (Removed) ---");

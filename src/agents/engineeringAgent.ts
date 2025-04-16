@@ -1,117 +1,208 @@
-import * as fs from 'fs';
-import * as path from 'path';
-// Add url import for ESM compatible __dirname
+import fs from 'fs/promises';
+import path from 'path';
 import * as url from 'url';
-// Import the shared AgentInput type
-import { AgentInput, AgentResponse } from '../types.js';
-// Import the actual LLM call function
+import { AgentBriefInput, AgentBrief, AgentReplyInput, AgentReply, AgentStructuredResponse, AgentInput_v0_2 } from '../types.js'; // Updated imports
 import { callLLM } from '../utils/llm.js';
 
 // ESM compatible __dirname
 const __filename = url.fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Remove placeholder LLM function
-// async function callLLM(prompt: string): Promise<string> { ... }
+const BRIEF_PROMPT_PATH = path.join(__dirname, '../../prompts/engineeringBriefPrompt.txt'); // Renamed
+const REPLY_PROMPT_PATH = path.join(__dirname, '../../prompts/engineeringReplyPrompt.txt'); // New
+const AGENT_NAME = "Engineering";
 
 /**
- * Parses the LLM response string (expected to be JSON) into an AgentResponse object.
+ * Parses the LLM response to extract and format relevant fields into a conversational string.
+ * Attempts to parse JSON, formats fields like recommendations/concerns, 
+ * otherwise returns the trimmed raw response.
+ * @param llmResponse The raw string response from the LLM.
+ * @param agentAction Type of action (brief or reply) for logging.
+ * @returns The formatted conversational string or an error message.
  */
-function parseEngineeringResponse(llmResponse: string | null): AgentResponse {
-    const agentName = "engineering"; // Define agent name
-    const defaultResponse: AgentResponse = {
-        agent: agentName,
-        recommendations: [`Error: Failed to parse LLM response for ${agentName} agent.`],
-        concerns: [],
-        flags: [],
-        confidence: 0.0,
-    };
-
+function parseLLMStringResponse(llmResponse: string | null, agentAction: 'brief' | 'reply'): string {
     if (!llmResponse) {
-        console.error(`${agentName} Agent received null response from LLM.`);
-        return defaultResponse;
+        console.error(`${AGENT_NAME} Agent received null ${agentAction} response from LLM.`);
+        return `Error: Failed to get ${agentAction} from LLM.`;
     }
 
+    const trimmedResponse = llmResponse.trim();
+
+    // Attempt to parse as JSON
     try {
-        const jsonMatch = llmResponse.match(/```json\n(\{.*?\})\n```/s);
-        if (!jsonMatch || !jsonMatch[1]) {
-             console.error(`Could not find JSON block in ${agentName} LLM response.`);
-             try {
-                  const parsed = JSON.parse(llmResponse);
-                  if (parsed && typeof parsed === 'object') {
-                      return {
-                          agent: parsed.agent || agentName,
-                          recommendations: parsed.recommendations || [],
-                          concerns: parsed.concerns || [],
-                          flags: parsed.flags || [],
-                          confidence: parsed.confidence ?? 0.0,
-                      };
-                  } else {
-                       throw new Error('Parsed content is not a valid object.');
-                  }
-             } catch (directParseError) {
-                  console.error(`Direct JSON parsing failed for ${agentName}:`, directParseError);
-                  console.error('Raw Response:', llmResponse);
-                  return { ...defaultResponse, recommendations: [`Error: Could not parse LLM response for ${agentName}. Raw output logged.`] };
-             }
+        let potentialJson = trimmedResponse;
+        // Handle potential markdown code blocks
+        const jsonMatch = trimmedResponse.match(/```(?:json)?\n?(\{.*?\})\n?```/s);
+        if (jsonMatch && jsonMatch[1]) {
+            potentialJson = jsonMatch[1];
         }
 
-        const jsonString = jsonMatch[1];
-        const parsed = JSON.parse(jsonString);
+        const parsed = JSON.parse(potentialJson);
+        const outputLines: string[] = [];
 
+        // --- Format relevant fields from JSON --- 
         if (parsed && typeof parsed === 'object') {
-            return {
-                agent: parsed.agent || agentName,
-                recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : [],
-                concerns: Array.isArray(parsed.concerns) ? parsed.concerns : [],
-                flags: Array.isArray(parsed.flags) ? parsed.flags : [],
-                confidence: (typeof parsed.confidence === 'number') ? Math.max(0, Math.min(1, parsed.confidence)) : 0.0,
-            };
-        } else {
-            console.error(`Parsed JSON is not a valid object for ${agentName}.`);
-            return defaultResponse;
+            // Add specific fields first if they exist
+            if (typeof parsed.brief === 'string' && parsed.brief.trim()) {
+                outputLines.push(parsed.brief.trim());
+            }
+             if (typeof parsed.reply === 'string' && parsed.reply.trim()) {
+                outputLines.push(parsed.reply.trim());
+            }
+             if (typeof parsed.message === 'string' && parsed.message.trim()) {
+                 outputLines.push(parsed.message.trim());
+            }
+             if (typeof parsed.summary === 'string' && parsed.summary.trim()) {
+                outputLines.push(parsed.summary.trim());
+            }
+             // Engineering specific
+             if (typeof parsed.assessment === 'string' && parsed.assessment.trim()) {
+                 outputLines.push(parsed.assessment.trim());
+            }
+
+            // Format common structured fields 
+            if (Array.isArray(parsed.recommendations) && parsed.recommendations.length > 0) {
+                outputLines.push("Recommendations:");
+                parsed.recommendations.forEach((rec: unknown) => {
+                    if (typeof rec === 'string' && rec.trim()) {
+                        outputLines.push(`- ${rec.trim()}`);
+                    }
+                });
+            }
+            if (Array.isArray(parsed.concerns) && parsed.concerns.length > 0) {
+                 if (outputLines.length > 0 && !outputLines[outputLines.length -1].startsWith("Concerns:")) outputLines.push("");
+                outputLines.push("Concerns:");
+                parsed.concerns.forEach((con: unknown) => {
+                    if (typeof con === 'string' && con.trim()) {
+                        outputLines.push(`- ${con.trim()}`);
+                    }
+                });
+            }
+             if (Array.isArray(parsed.flags) && parsed.flags.length > 0) {
+                 if (outputLines.length > 0 && !outputLines[outputLines.length -1].startsWith("Flags:")) outputLines.push("");
+                 outputLines.push("Flags:");
+                parsed.flags.forEach((flag: unknown) => {
+                    if (typeof flag === 'string' && flag.trim()) {
+                        outputLines.push(`- ${flag.trim()}`);
+                    }
+                });
+            }
+            
+            // If we found and formatted fields, join them
+            if (outputLines.length > 0) {
+                return outputLines.join('\n');
+            }
         }
+        
+        // If JSON parsed but was empty or had no relevant fields, return raw 
+        console.warn(`${AGENT_NAME} Agent parsed JSON but found no relevant fields to format (${agentAction}). Returning raw response.`);
+        return trimmedResponse; 
+
     } catch (error) {
-        console.error(`Error parsing JSON response for ${agentName} Agent:`, error);
-        console.error('Raw Response:', llmResponse);
-        return { ...defaultResponse, recommendations: [`Error: Could not parse LLM response for ${agentName}. Raw output logged.`] };
+        // If JSON parsing fails, assume it's plain text
+        if (error instanceof SyntaxError) {
+             return trimmedResponse;
+        } else {
+             console.error(`Unexpected error parsing ${agentAction} response for ${AGENT_NAME}:`, error);
+             return `Error: Unexpected parsing issue for ${agentAction}.`;
+        }
     }
 }
 
-// Use the imported AgentInput type
-export async function runEngineeringAgent(input: AgentInput): Promise<AgentResponse> {
-  // Construct path relative to current file using ESM compatible __dirname
-  const promptPath = path.join(__dirname, '../../prompts/engineeringPrompt.txt');
-  const promptTemplate = fs.readFileSync(promptPath, 'utf-8');
+/**
+ * Generates the initial brief for the Engineering Agent.
+ */
+export async function getEngineeringAgentBrief(input: AgentBriefInput): Promise<AgentBrief> {
+    let template: string;
+    try {
+        template = await fs.readFile(BRIEF_PROMPT_PATH, 'utf-8');
+    } catch (error) {
+        console.error(`Error reading prompt template ${BRIEF_PROMPT_PATH}:`, error);
+        return "Error: Engineering Agent failed to load brief prompt template.";
+    }
 
-  // Adjust how pulse data is accessed based on the imported AgentInput type
-  const combinedPrompt = `
-${promptTemplate}
+    const combinedPrompt = `
+${template}
 
 # Current Context:
+
 ## Pulse:
-${JSON.stringify(input.currentPulse, null, 2)} // Use input.currentPulse directly or specific fields
+${JSON.stringify(input.currentPulse, null, 2)}
 
-## Other Agent Reports:
-${JSON.stringify(input.otherAgentReports || {}, null, 2)}
+## Company Memo (if available):
+${input.companyMemo ? JSON.stringify(input.companyMemo, null, 2) : 'Not available'}
 
-# Engineering Agent Analysis:
+# Instructions:
+Generate a brief, concise (1-3 sentences) opening statement for the Engineering agent based on the context.
+Focus on potential technical debt, performance issues, blockers, or relevant engineering practices based *only* on the Pulse and Memo provided.
+Do not ask questions, just provide your initial assessment.
+
+# Engineering Agent Brief:
 `;
 
-  try {
-    // Call the imported LLM function
-    const response = await callLLM(combinedPrompt);
-    // Parse the response
-    const structuredResponse = parseEngineeringResponse(response);
-    return structuredResponse;
-  } catch (error) {
-    console.error(`Error running Engineering Agent LLM call:`, error);
-    return {
-        agent: "engineering",
-        recommendations: [`Critical Error: Exception during ${name} agent execution.`],
-        concerns: [],
-        flags: [],
-        confidence: 0.0,
-    };
-  }
-} 
+    try {
+        const llmResponse = await callLLM(combinedPrompt);
+        const brief = parseLLMStringResponse(llmResponse, 'brief');
+        console.log("Engineering Agent brief generated.");
+        return brief;
+    } catch (error) {
+        console.error(`Error during Engineering Agent brief LLM call:`, error);
+        return "Critical Error: Exception during Engineering agent brief generation.";
+    }
+}
+
+/**
+ * Generates the follow-up reply for the Engineering Agent based on user response.
+ */
+export async function getEngineeringAgentReply(input: AgentReplyInput): Promise<AgentReply> {
+    let template: string;
+    try {
+        template = await fs.readFile(REPLY_PROMPT_PATH, 'utf-8');
+    } catch (error) {
+        console.error(`Error reading prompt template ${REPLY_PROMPT_PATH}:`, error);
+        return "Error: Engineering Agent failed to load reply prompt template.";
+    }
+
+    const combinedPrompt = `
+${template}
+
+# Original Context:
+
+## Pulse:
+${JSON.stringify(input.currentPulse, null, 2)}
+
+## Company Memo (if available):
+${input.companyMemo ? JSON.stringify(input.companyMemo, null, 2) : 'Not available'}
+
+# Conversation History:
+
+## Your Initial Brief:
+${input.initialBrief}
+
+## User's Response:
+${input.userResponse}
+
+# Instructions:
+Generate a concise (1-3 sentences) follow-up reply based on the user's response, considering the original context and your initial brief.
+Acknowledge the user's input and provide a relevant technical insight or clarification.
+Do not ask follow-up questions.
+
+# Engineering Agent Reply:
+`;
+
+    try {
+        const llmResponse = await callLLM(combinedPrompt);
+        const reply = parseLLMStringResponse(llmResponse, 'reply');
+        console.log("Engineering Agent reply generated.");
+        return reply;
+    } catch (error) {
+        console.error(`Error during Engineering Agent reply LLM call:`, error);
+        return "Critical Error: Exception during Engineering agent reply generation.";
+    }
+}
+
+// --- Deprecated v0.2 Agent --- 
+/*
+function parseEngineeringResponse_v0_2(llmResponse: string | null): AgentStructuredResponse { ... }
+export async function runEngineeringAgent_v0_2(input: AgentInput_v0_2): Promise<AgentStructuredResponse> { ... }
+*/ 

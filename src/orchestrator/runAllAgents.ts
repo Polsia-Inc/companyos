@@ -1,15 +1,25 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { AgentInput, AgentResponse, Context } from '../types.js';
-import { runStrategyAgent } from '../agents/strategyAgent.js';
-import { runEthicsAgent } from '../agents/ethicsAgent.js';
-import { runWellnessAgent } from '../agents/wellnessAgent.js';
-import { runProductAgent } from '../agents/productAgent.js';
-import { runEngineeringAgent } from '../agents/engineeringAgent.js';
-import { runMarketingAgent } from '../agents/marketingAgent.js';
-import { runChiefOfStaffAgent } from '../agents/chiefOfStaffAgent.js';
-import * as readline from 'node:readline/promises';
-import { stdin as input, stdout as output } from 'node:process';
+import {
+    Context,
+    AgentBriefInput,
+    AgentReplyInput,
+    AgentInteraction,
+    AgentBrief,
+    AgentReply,
+    UserResponse,
+    // AgentStructuredResponse // Keep if CoS needs it later, but not for phase 1 interaction loop
+} from '../types.js';
+import { getStrategyAgentBrief, getStrategyAgentReply } from '../agents/strategyAgent.js';
+import { getEthicsAgentBrief, getEthicsAgentReply } from '../agents/ethicsAgent.js';
+import { getWellnessAgentBrief, getWellnessAgentReply } from '../agents/wellnessAgent.js';
+import { getProductAgentBrief, getProductAgentReply } from '../agents/productAgent.js';
+import { getEngineeringAgentBrief, getEngineeringAgentReply } from '../agents/engineeringAgent.js';
+import { getMarketingAgentBrief, getMarketingAgentReply } from '../agents/marketingAgent.js';
+// import { runChiefOfStaffAgent } from '../agents/chiefOfStaffAgent.js'; // Phase 2
+// import * as readline from 'node:readline/promises'; // No longer needed for feedback
+// import { stdin as input, stdout as output } from 'node:process'; // No longer needed for feedback
+import inquirer from 'inquirer'; // Import inquirer
 
 const CONTEXT_DIR = 'context';
 const OUTPUTS_DIR = 'outputs';
@@ -127,74 +137,12 @@ async function loadCompanyMemo(): Promise<object | null> {
 }
 
 /**
- * Formats agent output for display (used by feedback loop and final printout).
- * @param agentName The name of the agent.
- * @param agentOutput The output (string or AgentResponse).
- * @returns A formatted string snippet.
- */
-function formatAgentOutputSnippet(agentName: string, agentOutput: string | AgentResponse | null): string {
-    let outputSnippet = 'No output or failed.';
-    const maxSnippetLength = 1000; // Keep consistent length for now
-
-    if (typeof agentOutput === 'string') {
-        // If it's the CoS directive string, show it directly (handled separately now)
-        // Treat other strings as potential errors or raw output
-        outputSnippet = agentOutput;
-    } else if (agentOutput && typeof agentOutput === 'object') {
-        let formatted = `Agent: ${agentOutput.agent}\n`;
-        if (agentOutput.recommendations && agentOutput.recommendations.length > 0) {
-            formatted += `Recommendations:\n${agentOutput.recommendations.map(r => `  - ${r}`).join('\n')}\n`;
-        }
-        if (agentOutput.concerns && agentOutput.concerns.length > 0) {
-            formatted += `Concerns:\n${agentOutput.concerns.map(c => `  - ${c}`).join('\n')}\n`;
-        }
-        if (agentOutput.flags && agentOutput.flags.length > 0) {
-            formatted += `Flags:\n${agentOutput.flags.map(f => `  - ${f}`).join('\n')}\n`;
-        }
-        if (agentOutput.confidence !== undefined) {
-             formatted += `Confidence: ${agentOutput.confidence}`;
-        }
-        outputSnippet = formatted.trim();
-    }
-    return outputSnippet;
-}
-
-/**
- * Prompts the user for feedback on agent outputs.
- * @param agentName The name of the agent being reviewed.
- * @param agentOutput The output produced by the agent (string or object).
- * @param rl The readline interface.
- * @returns A promise resolving to the feedback object.
- */
-async function getFeedbackForAgent(agentName: string, agentOutput: string | AgentResponse | null, rl: readline.Interface): Promise<{ rating: number | null; notes: string | null }> {
-    console.log(`\n--- Reviewing ${agentName} Agent ---`);
-    // Use the refactored formatting function for the snippet
-    const outputSnippet = formatAgentOutputSnippet(agentName, agentOutput);
-    console.log(`Output Snippet:\n${outputSnippet}`);
-
-    let rating: number | null = null;
-    while (rating === null) {
-        const ratingInput = await rl.question(`Rate ${agentName} output (1-5, 0 to skip): `);
-        const parsedRating = parseInt(ratingInput, 10);
-        if (!isNaN(parsedRating) && parsedRating >= 0 && parsedRating <= 5) {
-            rating = parsedRating === 0 ? null : parsedRating; // Store null if skipped
-        } else {
-            console.log("Invalid input. Please enter a number between 1 and 5, or 0 to skip.");
-        }
-    }
-
-    const notes = await rl.question(`Notes for ${agentName} (optional): `);
-
-    return { rating, notes: notes || null };
-}
-
-/**
- * Main orchestrator function.
+ * Main orchestrator function - Refactored for v0.2.5 Phase 1.
  */
 async function runOrchestrator() {
-    console.log("Starting Orchestrator...");
+    console.log("Starting Orchestrator v0.2.5...");
 
-    // 1. Load Context
+    // 1. Load Context (Same as v0.2)
     const currentPulse = await loadCurrentPulse();
     if (!currentPulse) {
         console.error("Failed to load current pulse context. Exiting.");
@@ -205,176 +153,151 @@ async function runOrchestrator() {
     const companySummary = await loadCompanySummary();
     const companyMemo = await loadCompanyMemo();
 
-    // 2. Construct Agent Input
-    const baseAgentInput: AgentInput = {
+    // 2. Construct Base Agent Input for Briefs
+    const agentBriefInput: AgentBriefInput = {
         currentPulse: currentPulse,
         pulseHistory: pulseHistory.length > 0 ? pulseHistory : undefined,
         companyDocs: companySummary ? { summary: companySummary } : undefined,
+        companyMemo: companyMemo ?? undefined, // Pass memo if loaded
     };
 
-    // 3. Run Agents (Tier 1 Council + Chief of Staff)
-    const agentResponses: { [key: string]: string | AgentResponse } = {};
-
-    // Helper to run an agent and store its result or error
-    const runAgent = async (name: string, agentFn: (input: AgentInput) => Promise<string | AgentResponse>) => {
-        try {
-            console.log(`\n--- Running ${name} Agent ---`);
-            const response = await agentFn(baseAgentInput);
-            agentResponses[name.toLowerCase()] = response; // Store response keyed by lowercase name
-            console.log(`--- ${name} Agent Complete ---`);
-        } catch (error) {
-            console.error(`Error running ${name} Agent:`, error);
-            // Store a simplified error object or message
-            agentResponses[name.toLowerCase()] = `Agent ${name} failed to run: ${error instanceof Error ? error.message : String(error)}`;
-        }
-    };
-
-    // Define agents to run in order
-    const agentsToRun: { name: string; runner: (input: AgentInput) => Promise<string | AgentResponse> }[] = [
-        { name: 'Strategy', runner: runStrategyAgent },
-        { name: 'Ethics', runner: runEthicsAgent },
-        { name: 'Wellness', runner: runWellnessAgent },
-        { name: 'Product', runner: runProductAgent },
-        { name: 'Engineering', runner: runEngineeringAgent },
-        { name: 'Marketing', runner: runMarketingAgent },
+    // 3. Define Agents for Interactive Loop
+    // TODO: Later, load this dynamically based on config (Phase 3)
+    const agents = [
+        {
+            name: 'Strategy',
+            getBrief: getStrategyAgentBrief,
+            getReply: getStrategyAgentReply,
+        },
+        {
+            name: 'Ethics',
+            getBrief: getEthicsAgentBrief,
+            getReply: getEthicsAgentReply,
+        },
+        {
+            name: 'Wellness',
+            getBrief: getWellnessAgentBrief,
+            getReply: getWellnessAgentReply,
+        },
+        {
+            name: 'Product',
+            getBrief: getProductAgentBrief,
+            getReply: getProductAgentReply,
+        },
+        {
+            name: 'Engineering',
+            getBrief: getEngineeringAgentBrief,
+            getReply: getEngineeringAgentReply,
+        },
+        {
+            name: 'Marketing',
+            getBrief: getMarketingAgentBrief,
+            getReply: getMarketingAgentReply,
+        },
+        // Add other agents here as they are refactored/created
     ];
 
-    // Run agents sequentially and collect responses
-    for (const agent of agentsToRun) {
-        await runAgent(agent.name, agent.runner);
-    }
+    // 4. Initialize Interaction History (for Phase 2)
+    const interactionHistory: AgentInteraction[] = [];
 
-    // 3.5 Run Chief of Staff Agent (after all others)
-    let chiefOfStaffDirective: string | null = null;
-    try {
-        console.log(`\n--- Running Chief of Staff Agent ---`);
-        const chiefOfStaffInput: AgentInput = {
-            ...baseAgentInput,
-            otherAgentReports: agentResponses,
-            companyMemo: companyMemo ?? undefined,
-        };
-        chiefOfStaffDirective = await runChiefOfStaffAgent(chiefOfStaffInput);
-        console.log(`--- Chief of Staff Agent Complete ---`);
+    // 5. Run Interactive Agent Loop
+    console.log("\n====== 💬 Agent One-on-Ones ======");
+    for (const agent of agents) {
+        console.log(`\n--- Engaging ${agent.name} Agent ---`);
+        let currentInteraction: Partial<AgentInteraction> = { agentName: agent.name, skipped: false };
 
-        // Print the formatted directive to the console
-        if (chiefOfStaffDirective && typeof chiefOfStaffDirective === 'string') {
-            console.log("\n====== 🧠 Chief of Staff Summary ======");
-            console.log(chiefOfStaffDirective.trim()); // Trim to remove leading/trailing whitespace
-            console.log("====================================\n");
-        } else {
-             console.log("\nChief of Staff directive was not generated or is not a string.\n");
+        try {
+            const brief: AgentBrief = await agent.getBrief(agentBriefInput);
+            currentInteraction.brief = brief;
+            console.log(`\n${agent.name} says:\n${brief}`);
+
+            const { action } = await inquirer.prompt([
+                {
+                    type: 'list',
+                    name: 'action',
+                    message: `Action for ${agent.name}?`,
+                    choices: [
+                        { name: 'Include these ideas, next agent', value: 'next' },
+                        { name: 'Respond (Provide feedback/question)', value: 'respond' },
+                        { name: "Don't include, skip agent", value: 'skip' },
+                    ],
+                },
+            ]);
+
+            if (action === 'skip') {
+                console.log(`Skipping ${agent.name} Agent.`);
+                currentInteraction.skipped = true;
+            } else if (action === 'respond') {
+                const { userResponse } = await inquirer.prompt([
+                    {
+                        type: 'input',
+                        name: 'userResponse',
+                        message: `Your response to ${agent.name}:`,
+                    },
+                ]);
+                currentInteraction.userResponse = userResponse as UserResponse;
+
+                if (userResponse) { // Only call reply if user actually responded
+                    const replyInput: AgentReplyInput = {
+                        ...agentBriefInput, // Pass base context
+                        initialBrief: brief,
+                        userResponse: userResponse,
+                    };
+                    const reply: AgentReply = await agent.getReply(replyInput);
+                    currentInteraction.agentReply = reply;
+                    console.log(`\n${agent.name} replies:\n${reply}`);
+                     // User sees reply, then implicitly moves to Next/Pass state
+                    console.log(`(Continuing to next agent...)`);
+                } else {
+                    console.log(`(No response provided, continuing...)`);
+                }
+
+            } else { // action === 'next'
+                console.log(`Continuing past ${agent.name} Agent.`);
+                // No userResponse or agentReply needed for 'next'
+            }
+
+        } catch (error) {
+            console.error(`Error interacting with ${agent.name} Agent:`, error);
+            currentInteraction.brief = currentInteraction.brief ?? `Error during ${agent.name} interaction.`; // Add error note if brief failed
+            currentInteraction.skipped = true; // Treat errors as skips for now
         }
-    } catch (error) {
-        console.error(`Error running Chief of Staff Agent:`, error);
-        chiefOfStaffDirective = `Chief of Staff Agent failed to run: ${error instanceof Error ? error.message : String(error)}`;
-    }
 
-    // Print individual agent outputs after the CoS summary
-    console.log("\n====== 🕵️ Individual Agent Outputs ====== ");
-    for (const agentName in agentResponses) {
-        // Use the same formatting function as the feedback loop
-        const formattedOutput = formatAgentOutputSnippet(agentName, agentResponses[agentName]);
-        console.log(`\n--- ${agentName.charAt(0).toUpperCase() + agentName.slice(1)} Agent ---`);
-        console.log(formattedOutput);
+        // Add the completed interaction (even if skipped/error) to history
+        interactionHistory.push(currentInteraction as AgentInteraction);
     }
-    console.log("========================================\n");
+    console.log("==================================\n");
 
-    // 4. Format and Save Output
+    // 6. Run Chief of Staff Synthesis (Phase 2)
+    console.log("\n--- Chief of Staff Synthesis (Phase 2 - Not Implemented Yet) ---");
+    // TODO: Pass interactionHistory to ChiefOfStaffAgent
+    // const chiefOfStaffInput = { ...agentBriefInput, interactions: interactionHistory };
+    // const chiefOfStaffDirective = await runChiefOfStaffAgent(chiefOfStaffInput);
+    // console.log("\n====== 🧠 Chief of Staff Summary ======");
+    // console.log(chiefOfStaffDirective);
+    // console.log("====================================\n");
+
+    // 7. Save Outputs (Phase 2)
+    console.log("--- Output Saving (Phase 2 - Not Implemented Yet) ---");
+    // TODO: Save interactionHistory and CoS summary to JSON/MD files
+    /*
     const outputDate = new Date().toISOString().split('T')[0];
     const outputFilePath = path.join(OUTPUTS_DIR, `${outputDate}.json`);
-
-    // Define the structure for the output data, including the feedback field
-    const outputData: {
-        date: string;
-        context_used: any;
-        responses: { [key: string]: string | AgentResponse };
-        chief_of_staff_summary: string | null;
-        creative_director_input: {
-            notes: string | null;
-            manual_overrides: object;
-            agent_feedback?: { // Make feedback optional initially
-                [agentName: string]: { rating: number | null; notes: string | null };
-            };
-        };
-    } = {
+    const outputData = {
         date: outputDate,
-        context_used: {
-            currentPulse: currentPulse,
-            pulseHistoryCount: pulseHistory.length,
-            companySummaryLoaded: !!companySummary,
-            companyMemoLoaded: !!companyMemo,
-        },
-        responses: agentResponses,
-        chief_of_staff_summary: chiefOfStaffDirective,
-        creative_director_input: { // Initialize matching the defined structure
-            notes: null,
-            manual_overrides: {},
-            // agent_feedback will be added later if user provides feedback
-        },
+        context_used: { ... }, // Summary of context used
+        interactions: interactionHistory, // Save the new structure
+        chief_of_staff_summary: chiefOfStaffDirective, // Save CoS output
     };
+    await fs.mkdir(OUTPUTS_DIR, { recursive: true });
+    await fs.writeFile(outputFilePath, JSON.stringify(outputData, null, 2));
+    console.log(`Saved output to ${outputFilePath}`);
+    // Also save summary MD if needed
+    */
 
-    try {
-        await fs.mkdir(OUTPUTS_DIR, { recursive: true }); // Ensure output directory exists
-        await fs.writeFile(outputFilePath, JSON.stringify(outputData, null, 2));
-        console.log(`Successfully wrote output to ${outputFilePath}`);
-    } catch (error) {
-        console.error(`Error writing output file ${outputFilePath}:`, error);
-    }
+    // 8. Feedback Loop (Removed in v0.2.5 as per PRD)
+    // console.log("--- Feedback Loop (Removed) ---");
 
-    // Write the Chief of Staff summary to a separate Markdown file
-    if (chiefOfStaffDirective && typeof chiefOfStaffDirective === 'string') {
-        const summaryFilePath = path.join(OUTPUTS_DIR, `${outputDate}.summary.md`);
-        try {
-            await fs.writeFile(summaryFilePath, chiefOfStaffDirective);
-            console.log(`Successfully wrote summary to ${summaryFilePath}`);
-        } catch (summaryWriteError) {
-            console.error(`Error writing summary file ${summaryFilePath}:`, summaryWriteError);
-        }
-    } else {
-        console.warn("Skipping summary file write because Chief of Staff directive was not available.");
-    }
-
-    // 5. Optional Feedback Loop
-    const rl = readline.createInterface({ input, output });
-    try {
-        const collectFeedback = await rl.question('\nDo you want to provide feedback on the agent outputs? (y/N) ');
-        if (collectFeedback.toLowerCase() === 'y') {
-            console.log("\n--- Starting Feedback Loop --- ");
-            // We need to read the file we just wrote to get the structured data
-            // Alternatively, we could work with the outputData object directly
-            const feedbackData = outputData; // Work with the in-memory object directly
-            // Initialize agent_feedback if it doesn't exist (it shouldn't initially)
-            feedbackData.creative_director_input.agent_feedback = {};
-
-            // Iterate through agent responses
-            for (const agentName in feedbackData.responses) {
-                const agentFeedback = await getFeedbackForAgent(agentName, feedbackData.responses[agentName], rl);
-                if (agentFeedback.rating !== null || agentFeedback.notes !== null) {
-                    feedbackData.creative_director_input.agent_feedback[agentName] = agentFeedback;
-                }
-            }
-
-            // Get feedback for Chief of Staff separately
-            if (feedbackData.chief_of_staff_summary) {
-                 const cosFeedback = await getFeedbackForAgent('ChiefOfStaff', feedbackData.chief_of_staff_summary, rl);
-                 if (cosFeedback.rating !== null || cosFeedback.notes !== null) {
-                     feedbackData.creative_director_input.agent_feedback['chief_of_staff'] = cosFeedback;
-                 }
-            }
-
-            // Re-write the output file with feedback
-            try {
-                await fs.writeFile(outputFilePath, JSON.stringify(feedbackData, null, 2));
-                console.log(`\nUpdated output file ${outputFilePath} with feedback.`);
-            } catch (writeError) {
-                console.error(`Error writing updated output file ${outputFilePath}:`, writeError);
-            }
-        }
-    } catch (feedbackError) {
-        console.error("Error during feedback loop:", feedbackError);
-    } finally {
-        rl.close();
-    }
 
     console.log("Orchestrator finished.");
 }
